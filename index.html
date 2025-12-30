@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Quest: World Map</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0f5e9c; /* Ocean deep blue */
+            font-family: 'Inter', sans-serif;
+            color: white;
+        }
+
+        .pixel-font { font-family: 'VT323', monospace; text-transform: uppercase; }
+
+        /* Game Viewport */
+        #viewport {
+            width: 100vw;
+            height: 100vh;
+            cursor: grab;
+            overflow: hidden;
+            position: relative;
+            background: #106ca3;
+        }
+
+        #viewport:active { cursor: grabbing; }
+
+        /* The World Map with Ocean Texture */
+        #world-map {
+            position: absolute;
+            width: 3500px;
+            height: 2500px;
+            transform-origin: 0 0;
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            background-color: #106ca3;
+            background-image:
+                radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0);
+            background-size: 40px 40px;
+        }
+
+        /* Animated waves effect */
+        .wave {
+            position: absolute;
+            width: 20px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            animation: drift 4s infinite linear;
+        }
+
+        @keyframes drift {
+            0% { transform: translateX(0); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateX(40px); opacity: 0; }
+        }
+
+        /* Island Shaping using Clip-Path for Pixelated Look */
+        .island-card {
+            position: absolute;
+            width: 340px;
+            pointer-events: auto;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            filter: drop-shadow(0 15px 0 rgba(0,0,0,0.3));
+        }
+
+        .island-card:hover {
+            transform: scale(1.08) translateY(-15px);
+            z-index: 50;
+        }
+
+        .island-shape {
+            background: #e3c18d; /* Sandy shore */
+            padding: 12px;
+            clip-path: polygon(
+                10% 0%, 90% 2%, 100% 15%, 98% 85%, 85% 100%, 15% 98%, 0% 80%, 2% 20%
+            );
+            border: 4px solid #8b5a2b;
+        }
+
+        .island-image-container {
+            width: 100%;
+            height: 200px;
+            background: #111;
+            overflow: hidden;
+            position: relative;
+            clip-path: polygon(
+                5% 5%, 95% 2%, 98% 90%, 8% 95%, 2% 50%
+            );
+            border: 4px solid #000;
+        }
+
+        .island-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            image-rendering: pixelated;
+        }
+
+        .island-label {
+            background: #2e2e2e;
+            border: 3px solid #000;
+            padding: 10px;
+            margin-top: 10px;
+            text-align: center;
+            box-shadow: 4px 4px 0 #000;
+            transform: rotate(-1deg);
+        }
+
+        /* Sequential Path Styling */
+        .path-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .connection-line {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.3);
+            stroke-width: 8;
+            stroke-dasharray: 15, 15;
+            stroke-linecap: round;
+            animation: dashMove 20s linear infinite;
+        }
+
+        @keyframes dashMove {
+            from { stroke-dashoffset: 1000; }
+            to { stroke-dashoffset: 0; }
+        }
+
+        /* UI Elements */
+        .ui-panel {
+            position: fixed;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        .mc-button {
+            image-rendering: pixelated;
+            background: #4e4e4e;
+            border: 3px solid #000;
+            box-shadow: inset -3px -3px 0 #2e2e2e, inset 3px 3px 0 #8e8e8e;
+            padding: 8px 15px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            padding: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-left-color: #ffd700;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Mini-map */
+        #minimap {
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 133px;
+            background: rgba(0,0,0,0.8);
+            border: 2px solid #555;
+            overflow: hidden;
+        }
+
+        #minimap-viewport {
+            position: absolute;
+            border: 1px solid #ffd700;
+            background: rgba(255,215,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <header class="ui-panel top-0 left-0 w-full p-6 flex justify-between items-center pointer-events-none">
+        <div class="pointer-events-auto">
+            <h1 class="pixel-font text-4xl text-yellow-400 drop-shadow-lg">WORLD OF DATA</h1>
+            <p class="text-xs text-gray-200 uppercase tracking-widest font-bold">Chart your course across the digital sea</p>
+        </div>
+        <div class="flex gap-4 pointer-events-auto">
+            <div class="mc-button px-4 flex items-center gap-2">
+                <span class="text-yellow-400">⭐</span> <span id="star-count" class="pixel-font">0 / 18</span>
+            </div>
+        </div>
+    </header>
+
+    <div id="viewport">
+        <div id="world-map">
+            <svg id="paths" class="path-svg"></svg>
+            <!-- Islands injected via JS -->
+        </div>
+    </div>
+
+    <!-- Zoom Controls -->
+    <div class="ui-panel bottom-10 left-10 flex flex-col gap-2">
+        <button onclick="changeZoom(0.1)" class="mc-button text-2xl w-12 h-12 flex items-center justify-center">+</button>
+        <button onclick="changeZoom(-0.1)" class="mc-button text-2xl w-12 h-12 flex items-center justify-center">-</button>
+        <button onclick="resetView()" class="mc-button text-xs pixel-font h-10">Reset View</button>
+    </div>
+
+    <!-- Minimap -->
+    <div id="minimap" class="ui-panel">
+        <div id="minimap-content" class="relative w-full h-full scale-[0.06] origin-top-left"></div>
+        <div id="minimap-viewport"></div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="modal" class="modal-overlay">
+        <div class="bg-[#1a1a1a] border-4 border-black w-full max-w-5xl p-6 relative shadow-2xl">
+            <button onclick="closeModal()" class="absolute -top-4 -right-4 bg-red-600 w-10 h-10 border-2 border-black pixel-font text-xl">X</button>
+            <div id="modal-content" class="max-h-[80vh] overflow-y-auto pr-2"></div>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = "";
+        const maps = [
+            {
+                id: 0, title: "Onboarding Island", x: 400, y: 1200, theme: "The Portal", color: "#4ade80",
+                prompt: "Top down pixel art island, sandy beach, a single computer terminal on a grass patch, tropical trees, 8-bit game style",
+                challenge: "Establish your connection to the cloud databases.",
+                stars: ["Connect to Postgres", "Verify Python Env", "Run First Query"], boss: "The Ghostly Config"
+            },
+            {
+                id: 1, title: "SQL Kingdom", x: 900, y: 800, theme: "Relational Fortress", color: "#fbbf24",
+                prompt: "Pixel art stone castle island, shapes of tables in the architecture, surrounded by water, 8-bit isometric style",
+                challenge: "Master the art of joining disparate tables.",
+                stars: ["Complex Multi-Joins", "Subquery Logic", "Window Function Mastery"], boss: "The Duplicate Dragon"
+            },
+            {
+                id: 2, title: "Database Forge", x: 1600, y: 600, theme: "Core Engine", color: "#f87171",
+                prompt: "Volcanic pixel art island, flowing lava rivers, anvil on the shore, dark rock, 8-bit game style",
+                challenge: "Optimize high-latency queries using indexes.",
+                stars: ["Identify Slow Scans", "B-Tree Implementation", "Read Explain Plans"], boss: "The Sluggish Giant"
+            },
+            {
+                id: 3, title: "Python Valley", x: 2200, y: 1000, theme: "Scripting Grove", color: "#60a5fa",
+                prompt: "Green jungle pixel art island, winding rivers, giant floating python snake, 8-bit style",
+                challenge: "Clean messy CSV/JSON data and automate transformation.",
+                stars: ["Pandas Cleaning", "API Integration", "Exception Handling"], boss: "The Dirty Data Swamp"
+            },
+            {
+                id: 4, title: "Pipeline City", x: 2800, y: 1500, theme: "Infrastructure Hub", color: "#a78bfa",
+                prompt: "Floating metal city pixel art island, pipes crossing everywhere, neon lights, 8-bit style",
+                challenge: "Build a reliable ETL pipeline.",
+                stars: ["Schedule Jobs", "Build Logging", "Error Retries"], boss: "The Midnight Crash"
+            },
+            {
+                id: 5, title: "Insight Arena", x: 2000, y: 1800, theme: "Champions' Court", color: "#f472b6",
+                prompt: "Colosseum pixel art island, crystal ground, bar charts made of light, 8-bit style",
+                challenge: "Turn raw numbers into a narrative.",
+                stars: ["KPI Definition", "Plotly Visualization", "Data Storytelling"], boss: "The Skeptical Executive"
+            }
+        ];
+
+        let scale = 1;
+        let posX = 0;
+        let posY = 0;
+        let isDragging = false;
+        let startX, startY;
+
+        const worldMap = document.getElementById('world-map');
+        const viewport = document.getElementById('viewport');
+
+        function createWaves() {
+            for (let i = 0; i < 80; i++) {
+                const wave = document.createElement('div');
+                wave.className = 'wave';
+                wave.style.left = Math.random() * 3500 + 'px';
+                wave.style.top = Math.random() * 2500 + 'px';
+                wave.style.animationDelay = Math.random() * 4 + 's';
+                worldMap.appendChild(wave);
+            }
+        }
+
+        function drawPaths() {
+            const pathSvg = document.getElementById('paths');
+            for (let i = 0; i < maps.length - 1; i++) {
+                const start = maps[i];
+                const end = maps[i + 1];
+                // Center point of the cards
+                const x1 = start.x + 170;
+                const y1 = start.y + 150;
+                const x2 = end.x + 170;
+                const y2 = end.y + 150;
+
+                // Create a curved path (quadratic bezier)
+                const cx = (x1 + x2) / 2 + (Math.random() - 0.5) * 200;
+                const cy = (y1 + y2) / 2 + (Math.random() - 0.5) * 200;
+
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                line.setAttribute("d", `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
+                line.setAttribute("class", "connection-line");
+                pathSvg.appendChild(line);
+            }
+        }
+
+        function updateTransform() {
+            worldMap.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+            updateMinimap();
+        }
+
+        function updateMinimap() {
+            const mv = document.getElementById('minimap-viewport');
+            const mmScale = 200 / 3500;
+            mv.style.width = (window.innerWidth / scale * mmScale) + 'px';
+            mv.style.height = (window.innerHeight / scale * mmScale) + 'px';
+            mv.style.left = (-posX / scale * mmScale) + 'px';
+            mv.style.top = (-posY / scale * mmScale) + 'px';
+        }
+
+        async function generateIslandImage(prompt, islandId) {
+            const container = document.getElementById(`img-container-${islandId}`);
+            const img = document.getElementById(`img-${islandId}`);
+
+            const fetchWithRetry = async (url, options, retries = 5, backoff = 1000) => {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    if (retries > 0) {
+                        await new Promise(resolve => setTimeout(resolve, backoff));
+                        return fetchWithRetry(url, options, retries - 1, backoff * 2);
+                    }
+                    throw error;
+                }
+            };
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                const result = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instances: [{ prompt: prompt }],
+                        parameters: { sampleCount: 1 }
+                    })
+                });
+
+                if (result.predictions?.[0]?.bytesBase64Encoded) {
+                    const b64 = result.predictions[0].bytesBase64Encoded;
+                    img.src = `data:image/png;base64,${b64}`;
+                    container.querySelector('.loading-overlay').style.display = 'none';
+                }
+            } catch (err) {
+                container.querySelector('.loading-overlay').innerHTML = `
+                    <span class="text-red-500 text-[10px] text-center px-2">Lost at Sea</span>
+                    <button onclick="generateIslandImage('${prompt.replace(/'/g, "\\'")}', ${islandId})" class="text-[8px] underline text-blue-400">Retry</button>
+                `;
+            }
+        }
+
+        async function renderIslands() {
+            createWaves();
+            drawPaths();
+            const minimapContent = document.getElementById('minimap-content');
+
+            for (const map of maps) {
+                const el = document.createElement('div');
+                el.className = 'island-card';
+                el.style.left = map.x + 'px';
+                el.style.top = map.y + 'px';
+                el.innerHTML = `
+                    <div class="island-shape" style="background-color: ${map.color}22; border-color: ${map.color}aa">
+                        <div class="island-image-container" id="img-container-${map.id}" onclick="openMap(${map.id})">
+                            <div class="loading-overlay">
+                                <div class="spinner"></div>
+                                <span class="pixel-font text-[10px]">Spotting Land...</span>
+                            </div>
+                            <img id="img-${map.id}" class="island-image" src="" alt="">
+                        </div>
+                        <div class="island-label" style="border-top: 4px solid ${map.color}">
+                            <div class="pixel-font text-lg text-yellow-400">${map.title}</div>
+                            <div class="text-[10px] text-gray-400 uppercase tracking-tighter">${map.theme}</div>
+                        </div>
+                    </div>
+                `;
+                worldMap.appendChild(el);
+
+                const dot = document.createElement('div');
+                dot.style.position = 'absolute';
+                dot.style.left = map.x + 'px';
+                dot.style.top = map.y + 'px';
+                dot.style.width = '300px';
+                dot.style.height = '200px';
+                dot.style.background = map.color;
+                dot.style.borderRadius = '50%';
+                minimapContent.appendChild(dot);
+
+                await new Promise(r => setTimeout(r, 200));
+                generateIslandImage(map.prompt, map.id);
+            }
+            resetView();
+        }
+
+        viewport.onmousedown = (e) => {
+            if (e.target.closest('.island-card')) return;
+            isDragging = true;
+            startX = e.clientX - posX;
+            startY = e.clientY - posY;
+            worldMap.style.transition = 'none';
+        };
+        window.onmousemove = (e) => {
+            if (!isDragging) return;
+            posX = e.clientX - startX;
+            posY = e.clientY - startY;
+            updateTransform();
+        };
+        window.onmouseup = () => {
+            isDragging = false;
+            worldMap.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
+        };
+        viewport.onwheel = (e) => {
+            const zoomSpeed = 0.001;
+            const delta = -e.deltaY;
+            const oldScale = scale;
+            scale = Math.min(Math.max(0.1, scale + delta * zoomSpeed), 3);
+            const rect = viewport.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            posX = mouseX - (mouseX - posX) * (scale / oldScale);
+            posY = mouseY - (mouseY - posY) * (scale / oldScale);
+            updateTransform();
+        };
+
+        function changeZoom(amt) {
+            const oldScale = scale;
+            scale = Math.min(Math.max(0.1, scale + amt), 3);
+            posX = window.innerWidth / 2 - (window.innerWidth / 2 - posX) * (scale / oldScale);
+            posY = window.innerHeight / 2 - (window.innerHeight / 2 - posY) * (scale / oldScale);
+            updateTransform();
+        }
+
+        function resetView() {
+            const minX = Math.min(...maps.map(m => m.x));
+            const maxX = Math.max(...maps.map(m => m.x)) + 340;
+            const minY = Math.min(...maps.map(m => m.y));
+            const maxY = Math.max(...maps.map(m => m.y)) + 400;
+
+            const contentWidth = maxX - minX;
+            const contentHeight = maxY - minY;
+
+            const padding = 80;
+            const scaleX = (window.innerWidth - padding * 2) / contentWidth;
+            const scaleY = (window.innerHeight - padding * 2) / contentHeight;
+            scale = Math.min(scaleX, scaleY, 0.9);
+
+            posX = (window.innerWidth - contentWidth * scale) / 2 - minX * scale;
+            posY = (window.innerHeight - contentHeight * scale) / 2 - minY * scale;
+
+            updateTransform();
+        }
+
+        function openMap(id) {
+            const map = maps.find(m => m.id === id);
+            const modal = document.getElementById('modal');
+            const content = document.getElementById('modal-content');
+            const imgSrc = document.getElementById(`img-${id}`).src || "";
+
+            content.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                    <div class="lg:col-span-2">
+                        <div class="bg-black/60 border-4 border-black p-2 mb-4">
+                            <img src="${imgSrc}" class="w-full h-64 object-cover image-rendering-pixelated">
+                        </div>
+                        <h2 class="pixel-font text-5xl text-yellow-400 mb-2 leading-none">${map.title}</h2>
+                        <p class="text-gray-400 mb-6 uppercase tracking-widest text-sm font-bold border-b border-white/10 pb-4">${map.theme}</p>
+                        <div>
+                            <h4 class="pixel-font text-xl text-blue-400 mb-2">The Voyage</h4>
+                            <p class="text-sm text-gray-300 leading-relaxed">${map.challenge}</p>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-3 flex flex-col gap-6">
+                        <div class="bg-blue-900/10 border-2 border-blue-900/40 p-6 rounded">
+                            <h4 class="pixel-font text-2xl text-blue-400 mb-4">Mastery Stars</h4>
+                            <div class="grid grid-cols-1 gap-4">
+                                ${map.stars.map((star, idx) => `
+                                    <div class="flex items-center gap-4 bg-black/40 p-3 border border-white/5 rounded">
+                                        <div class="star active text-3xl">★</div>
+                                        <div><div class="text-xs text-gray-400 uppercase font-bold">Star ${idx + 1}</div><div class="text-sm font-bold">${star}</div></div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+        window.onload = () => {
+            renderIslands();
+            window.onresize = resetView;
+        };
+    </script>
+</body>
+</html>
