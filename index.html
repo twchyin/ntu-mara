@@ -251,40 +251,45 @@
     </div>
 
     <script>
-        const apiKey = "";
         const maps = [
             {
                 id: 0, title: "Onboarding Island", x: 400, y: 1200, theme: "The Portal", color: "#4ade80",
+                image: "assets/islands/onboarding-island.svg",
                 prompt: "Top down pixel art island, sandy beach, a single computer terminal on a grass patch, tropical trees, 8-bit game style",
                 challenge: "Establish your connection to the cloud databases.",
                 stars: ["Connect to Postgres", "Verify Python Env", "Run First Query"], boss: "The Ghostly Config"
             },
             {
                 id: 1, title: "SQL Kingdom", x: 900, y: 800, theme: "Relational Fortress", color: "#fbbf24",
+                image: "assets/islands/sql-kingdom.svg",
                 prompt: "Pixel art stone castle island, shapes of tables in the architecture, surrounded by water, 8-bit isometric style",
                 challenge: "Master the art of joining disparate tables.",
                 stars: ["Complex Multi-Joins", "Subquery Logic", "Window Function Mastery"], boss: "The Duplicate Dragon"
             },
             {
                 id: 2, title: "Database Forge", x: 1600, y: 600, theme: "Core Engine", color: "#f87171",
+                image: "assets/islands/database-forge.svg",
                 prompt: "Volcanic pixel art island, flowing lava rivers, anvil on the shore, dark rock, 8-bit game style",
                 challenge: "Optimize high-latency queries using indexes.",
                 stars: ["Identify Slow Scans", "B-Tree Implementation", "Read Explain Plans"], boss: "The Sluggish Giant"
             },
             {
                 id: 3, title: "Python Valley", x: 2200, y: 1000, theme: "Scripting Grove", color: "#60a5fa",
+                image: "assets/islands/python-valley.svg",
                 prompt: "Green jungle pixel art island, winding rivers, giant floating python snake, 8-bit style",
                 challenge: "Clean messy CSV/JSON data and automate transformation.",
                 stars: ["Pandas Cleaning", "API Integration", "Exception Handling"], boss: "The Dirty Data Swamp"
             },
             {
                 id: 4, title: "Pipeline City", x: 2800, y: 1500, theme: "Infrastructure Hub", color: "#a78bfa",
+                image: "assets/islands/pipeline-city.svg",
                 prompt: "Floating metal city pixel art island, pipes crossing everywhere, neon lights, 8-bit style",
                 challenge: "Build a reliable ETL pipeline.",
                 stars: ["Schedule Jobs", "Build Logging", "Error Retries"], boss: "The Midnight Crash"
             },
             {
                 id: 5, title: "Insight Arena", x: 2000, y: 1800, theme: "Champions' Court", color: "#f472b6",
+                image: "assets/islands/insight-arena.svg",
                 prompt: "Colosseum pixel art island, crystal ground, bar charts made of light, 8-bit style",
                 challenge: "Turn raw numbers into a narrative.",
                 stars: ["KPI Definition", "Plotly Visualization", "Data Storytelling"], boss: "The Skeptical Executive"
@@ -347,48 +352,6 @@
             mv.style.top = (-posY / scale * mmScale) + 'px';
         }
 
-        async function generateIslandImage(prompt, islandId) {
-            const container = document.getElementById(`img-container-${islandId}`);
-            const img = document.getElementById(`img-${islandId}`);
-
-            const fetchWithRetry = async (url, options, retries = 5, backoff = 1000) => {
-                try {
-                    const response = await fetch(url, options);
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    return await response.json();
-                } catch (error) {
-                    if (retries > 0) {
-                        await new Promise(resolve => setTimeout(resolve, backoff));
-                        return fetchWithRetry(url, options, retries - 1, backoff * 2);
-                    }
-                    throw error;
-                }
-            };
-
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                const result = await fetchWithRetry(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        instances: [{ prompt: prompt }],
-                        parameters: { sampleCount: 1 }
-                    })
-                });
-
-                if (result.predictions?.[0]?.bytesBase64Encoded) {
-                    const b64 = result.predictions[0].bytesBase64Encoded;
-                    img.src = `data:image/png;base64,${b64}`;
-                    container.querySelector('.loading-overlay').style.display = 'none';
-                }
-            } catch (err) {
-                container.querySelector('.loading-overlay').innerHTML = `
-                    <span class="text-red-500 text-[10px] text-center px-2">Lost at Sea</span>
-                    <button onclick="generateIslandImage('${prompt.replace(/'/g, "\\'")}', ${islandId})" class="text-[8px] underline text-blue-400">Retry</button>
-                `;
-            }
-        }
-
         async function renderIslands() {
             createWaves();
             drawPaths();
@@ -401,13 +364,9 @@
                 el.style.top = map.y + 'px';
                 el.innerHTML = `
                     <div class="island-shape" style="background-color: ${map.color}22; border-color: ${map.color}aa">
-                        <div class="island-image-container" id="img-container-${map.id}" onclick="openMap(${map.id})">
-                            <div class="loading-overlay">
-                                <div class="spinner"></div>
-                                <span class="pixel-font text-[10px]">Spotting Land...</span>
-                            </div>
-                            <img id="img-${map.id}" class="island-image" src="" alt="">
-                        </div>
+                    <div class="island-image-container" id="img-container-${map.id}" onclick="openMap(${map.id})">
+                        <img id="img-${map.id}" class="island-image" src="${map.image}" alt="${map.title}">
+                    </div>
                         <div class="island-label" style="border-top: 4px solid ${map.color}">
                             <div class="pixel-font text-lg text-yellow-400">${map.title}</div>
                             <div class="text-[10px] text-gray-400 uppercase tracking-tighter">${map.theme}</div>
@@ -426,8 +385,7 @@
                 dot.style.borderRadius = '50%';
                 minimapContent.appendChild(dot);
 
-                await new Promise(r => setTimeout(r, 200));
-                generateIslandImage(map.prompt, map.id);
+                await new Promise(r => setTimeout(r, 50));
             }
             resetView();
         }
