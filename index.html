@@ -32,85 +32,46 @@
 
         #viewport:active { cursor: grabbing; }
 
-        /* The World Map with Ocean Texture */
+        /* The World Map Base Image */
         #world-map {
             position: absolute;
-            width: 3500px;
-            height: 2500px;
+            width: 1536px;
+            height: 864px;
             transform-origin: 0 0;
             transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-            background-color: #106ca3;
-            background-image:
-                radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0);
-            background-size: 40px 40px;
+            background-color: #0f5e9c;
+            background-image: url("assets/world-map.png");
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
         }
 
-        /* Animated waves effect */
-        .wave {
+        /* Clickable Nodes */
+        .map-node {
             position: absolute;
-            width: 20px;
-            height: 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 2px;
-            animation: drift 4s infinite linear;
+            width: 68px;
+            height: 52px;
+            display: grid;
+            place-items: center;
+            font-family: 'VT323', monospace;
+            font-size: 28px;
+            color: #fef3c7;
+            background: radial-gradient(circle at 30% 30%, #ffdd8c, #c16a00 70%);
+            border: 3px solid #4b1e00;
+            border-radius: 12px;
+            box-shadow: 0 8px 0 #3a1600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        @keyframes drift {
-            0% { transform: translateX(0); opacity: 0; }
-            50% { opacity: 1; }
-            100% { transform: translateX(40px); opacity: 0; }
+        .map-node:hover {
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 0 12px 0 #3a1600;
+            z-index: 20;
         }
 
-        /* Island Shaping using Clip-Path for Pixelated Look */
-        .island-card {
-            position: absolute;
-            width: 340px;
-            pointer-events: auto;
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            filter: drop-shadow(0 15px 0 rgba(0,0,0,0.3));
-        }
-
-        .island-card:hover {
-            transform: scale(1.08) translateY(-15px);
-            z-index: 50;
-        }
-
-        .island-shape {
-            background: #e3c18d; /* Sandy shore */
-            padding: 12px;
-            clip-path: polygon(
-                10% 0%, 90% 2%, 100% 15%, 98% 85%, 85% 100%, 15% 98%, 0% 80%, 2% 20%
-            );
-            border: 4px solid #8b5a2b;
-        }
-
-        .island-image-container {
-            width: 100%;
-            height: 200px;
-            background: #111;
-            overflow: hidden;
-            position: relative;
-            clip-path: polygon(
-                5% 5%, 95% 2%, 98% 90%, 8% 95%, 2% 50%
-            );
-            border: 4px solid #000;
-        }
-
-        .island-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            image-rendering: pixelated;
-        }
-
-        .island-label {
-            background: #2e2e2e;
-            border: 3px solid #000;
-            padding: 10px;
-            margin-top: 10px;
-            text-align: center;
-            box-shadow: 4px 4px 0 #000;
-            transform: rotate(-1deg);
+        .map-node.boss {
+            background: radial-gradient(circle at 30% 30%, #ffd2a8, #a11a0a 70%);
+            color: #ffe5bf;
         }
 
         /* Sequential Path Styling */
@@ -206,6 +167,14 @@
             border: 1px solid #ffd700;
             background: rgba(255,215,0,0.1);
         }
+
+        #minimap-content {
+            background-image: url("assets/world-map.png");
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            width: 1536px;
+            height: 864px;
+        }
     </style>
 </head>
 <body>
@@ -238,7 +207,7 @@
 
     <!-- Minimap -->
     <div id="minimap" class="ui-panel">
-        <div id="minimap-content" class="relative w-full h-full scale-[0.06] origin-top-left"></div>
+        <div id="minimap-content" class="relative w-full h-full scale-[0.13] origin-top-left"></div>
         <div id="minimap-viewport"></div>
     </div>
 
@@ -251,49 +220,21 @@
     </div>
 
     <script>
-        const maps = [
-            {
-                id: 0, title: "Onboarding Island", x: 400, y: 1200, theme: "The Portal", color: "#4ade80",
-                image: "assets/islands/onboarding-island.svg",
-                prompt: "Top down pixel art island, sandy beach, a single computer terminal on a grass patch, tropical trees, 8-bit game style",
-                challenge: "Establish your connection to the cloud databases.",
-                stars: ["Connect to Postgres", "Verify Python Env", "Run First Query"], boss: "The Ghostly Config"
-            },
-            {
-                id: 1, title: "SQL Kingdom", x: 900, y: 800, theme: "Relational Fortress", color: "#fbbf24",
-                image: "assets/islands/sql-kingdom.svg",
-                prompt: "Pixel art stone castle island, shapes of tables in the architecture, surrounded by water, 8-bit isometric style",
-                challenge: "Master the art of joining disparate tables.",
-                stars: ["Complex Multi-Joins", "Subquery Logic", "Window Function Mastery"], boss: "The Duplicate Dragon"
-            },
-            {
-                id: 2, title: "Database Forge", x: 1600, y: 600, theme: "Core Engine", color: "#f87171",
-                image: "assets/islands/database-forge.svg",
-                prompt: "Volcanic pixel art island, flowing lava rivers, anvil on the shore, dark rock, 8-bit game style",
-                challenge: "Optimize high-latency queries using indexes.",
-                stars: ["Identify Slow Scans", "B-Tree Implementation", "Read Explain Plans"], boss: "The Sluggish Giant"
-            },
-            {
-                id: 3, title: "Python Valley", x: 2200, y: 1000, theme: "Scripting Grove", color: "#60a5fa",
-                image: "assets/islands/python-valley.svg",
-                prompt: "Green jungle pixel art island, winding rivers, giant floating python snake, 8-bit style",
-                challenge: "Clean messy CSV/JSON data and automate transformation.",
-                stars: ["Pandas Cleaning", "API Integration", "Exception Handling"], boss: "The Dirty Data Swamp"
-            },
-            {
-                id: 4, title: "Pipeline City", x: 2800, y: 1500, theme: "Infrastructure Hub", color: "#a78bfa",
-                image: "assets/islands/pipeline-city.svg",
-                prompt: "Floating metal city pixel art island, pipes crossing everywhere, neon lights, 8-bit style",
-                challenge: "Build a reliable ETL pipeline.",
-                stars: ["Schedule Jobs", "Build Logging", "Error Retries"], boss: "The Midnight Crash"
-            },
-            {
-                id: 5, title: "Insight Arena", x: 2000, y: 1800, theme: "Champions' Court", color: "#f472b6",
-                image: "assets/islands/insight-arena.svg",
-                prompt: "Colosseum pixel art island, crystal ground, bar charts made of light, 8-bit style",
-                challenge: "Turn raw numbers into a narrative.",
-                stars: ["KPI Definition", "Plotly Visualization", "Data Storytelling"], boss: "The Skeptical Executive"
-            }
+        const MAP_WIDTH = 1536;
+        const MAP_HEIGHT = 864;
+
+        const nodes = [
+            { id: 1, label: "L1", x: 260, y: 640, week: "Week 1: Onboarding Island", about: "Set up the tools, access the portal, and make your first successful query.", stars: ["Connect to the platform", "Run your first SQL query", "Submit onboarding checklist"] },
+            { id: 2, label: "L2", x: 220, y: 240, week: "Week 2: SQL Kingdom", about: "Explore tables, relationships, and primary keys to navigate the kingdom.", stars: ["Inspect schema diagram", "Filter with WHERE", "Join two tables"] },
+            { id: 3, label: "L3", x: 320, y: 250, week: "Week 3: SQL Kingdom", about: "Combine datasets using JOINs and learn to avoid duplicate pitfalls.", stars: ["INNER JOIN mastery", "LEFT JOIN comparisons", "Handle duplicates"] },
+            { id: 4, label: "L4", x: 430, y: 270, week: "Week 4: SQL Kingdom", about: "Level up with aggregation and grouping across the realm.", stars: ["GROUP BY and HAVING", "Aggregate functions", "Order results"] },
+            { id: 5, label: "L5", x: 880, y: 520, week: "Week 5: Python Valley", about: "Clean datasets and automate transformations with Python.", stars: ["Load CSV with pandas", "Clean missing values", "Export cleaned data"] },
+            { id: 6, label: "L6", x: 1000, y: 520, week: "Week 6: Python Valley", about: "Merge data sources and handle exceptions.", stars: ["Merge two datasets", "Handle key errors", "Write reusable functions"] },
+            { id: 7, label: "L7", x: 1120, y: 520, week: "Week 7: Python Valley", about: "Build a mini pipeline that runs end-to-end.", stars: ["Create ETL script", "Schedule a run", "Generate a report"] },
+            { id: 8, label: "L8", x: 700, y: 360, week: "Week 8: Database Forge", about: "Learn to optimize queries with indexes and explain plans.", stars: ["Identify slow queries", "Add index", "Compare execution plan"] },
+            { id: 9, label: "L9", x: 820, y: 360, week: "Week 9: Database Forge", about: "Refactor queries for efficiency and cost.", stars: ["Rewrite heavy query", "Reduce scanned rows", "Document improvements"] },
+            { id: 10, label: "L10", x: 940, y: 360, week: "Week 10: Database Forge", about: "Measure performance and enforce limits.", stars: ["Set query timeout", "Monitor performance", "Optimize joins"] },
+            { id: 11, label: "L11", x: 1200, y: 220, week: "Week 11: Final Dungeon", about: "Prepare for the boss stages and finalize your mastery.", stars: ["Boss stage 1 clear", "Boss stage 2 clear", "Final reflection"] }
         ];
 
         let scale = 1;
@@ -305,27 +246,16 @@
         const worldMap = document.getElementById('world-map');
         const viewport = document.getElementById('viewport');
 
-        function createWaves() {
-            for (let i = 0; i < 80; i++) {
-                const wave = document.createElement('div');
-                wave.className = 'wave';
-                wave.style.left = Math.random() * 3500 + 'px';
-                wave.style.top = Math.random() * 2500 + 'px';
-                wave.style.animationDelay = Math.random() * 4 + 's';
-                worldMap.appendChild(wave);
-            }
-        }
-
         function drawPaths() {
             const pathSvg = document.getElementById('paths');
-            for (let i = 0; i < maps.length - 1; i++) {
-                const start = maps[i];
-                const end = maps[i + 1];
+            for (let i = 0; i < nodes.length - 1; i++) {
+                const start = nodes[i];
+                const end = nodes[i + 1];
                 // Center point of the cards
-                const x1 = start.x + 170;
-                const y1 = start.y + 150;
-                const x2 = end.x + 170;
-                const y2 = end.y + 150;
+                const x1 = start.x + 34;
+                const y1 = start.y + 26;
+                const x2 = end.x + 34;
+                const y2 = end.y + 26;
 
                 // Create a curved path (quadratic bezier)
                 const cx = (x1 + x2) / 2 + (Math.random() - 0.5) * 200;
@@ -345,45 +275,25 @@
 
         function updateMinimap() {
             const mv = document.getElementById('minimap-viewport');
-            const mmScale = 200 / 3500;
+            const mmScale = 200 / MAP_WIDTH;
             mv.style.width = (window.innerWidth / scale * mmScale) + 'px';
             mv.style.height = (window.innerHeight / scale * mmScale) + 'px';
             mv.style.left = (-posX / scale * mmScale) + 'px';
             mv.style.top = (-posY / scale * mmScale) + 'px';
         }
 
-        async function renderIslands() {
-            createWaves();
+        async function renderNodes() {
             drawPaths();
-            const minimapContent = document.getElementById('minimap-content');
-
-            for (const map of maps) {
-                const el = document.createElement('div');
-                el.className = 'island-card';
-                el.style.left = map.x + 'px';
-                el.style.top = map.y + 'px';
-                el.innerHTML = `
-                    <div class="island-shape" style="background-color: ${map.color}22; border-color: ${map.color}aa">
-                    <div class="island-image-container" id="img-container-${map.id}" onclick="openMap(${map.id})">
-                        <img id="img-${map.id}" class="island-image" src="${map.image}" alt="${map.title}">
-                    </div>
-                        <div class="island-label" style="border-top: 4px solid ${map.color}">
-                            <div class="pixel-font text-lg text-yellow-400">${map.title}</div>
-                            <div class="text-[10px] text-gray-400 uppercase tracking-tighter">${map.theme}</div>
-                        </div>
-                    </div>
-                `;
+            for (const node of nodes) {
+                const el = document.createElement('button');
+                el.className = 'map-node';
+                if (node.id === 11) el.classList.add('boss');
+                el.style.left = node.x + 'px';
+                el.style.top = node.y + 'px';
+                el.setAttribute('aria-label', node.week);
+                el.textContent = node.label;
+                el.onclick = () => openMap(node.id);
                 worldMap.appendChild(el);
-
-                const dot = document.createElement('div');
-                dot.style.position = 'absolute';
-                dot.style.left = map.x + 'px';
-                dot.style.top = map.y + 'px';
-                dot.style.width = '300px';
-                dot.style.height = '200px';
-                dot.style.background = map.color;
-                dot.style.borderRadius = '50%';
-                minimapContent.appendChild(dot);
 
                 await new Promise(r => setTimeout(r, 50));
             }
@@ -391,7 +301,7 @@
         }
 
         viewport.onmousedown = (e) => {
-            if (e.target.closest('.island-card')) return;
+            if (e.target.closest('.map-node')) return;
             isDragging = true;
             startX = e.clientX - posX;
             startY = e.clientY - posY;
@@ -429,10 +339,10 @@
         }
 
         function resetView() {
-            const minX = Math.min(...maps.map(m => m.x));
-            const maxX = Math.max(...maps.map(m => m.x)) + 340;
-            const minY = Math.min(...maps.map(m => m.y));
-            const maxY = Math.max(...maps.map(m => m.y)) + 400;
+            const minX = 0;
+            const maxX = MAP_WIDTH;
+            const minY = 0;
+            const maxY = MAP_HEIGHT;
 
             const contentWidth = maxX - minX;
             const contentHeight = maxY - minY;
@@ -449,22 +359,21 @@
         }
 
         function openMap(id) {
-            const map = maps.find(m => m.id === id);
+            const map = nodes.find(m => m.id === id);
             const modal = document.getElementById('modal');
             const content = document.getElementById('modal-content');
-            const imgSrc = document.getElementById(`img-${id}`).src || "";
 
             content.innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
                     <div class="lg:col-span-2">
                         <div class="bg-black/60 border-4 border-black p-2 mb-4">
-                            <img src="${imgSrc}" class="w-full h-64 object-cover image-rendering-pixelated">
+                            <div class="w-full h-64 bg-[url('assets/world-map.png')] bg-cover bg-center"></div>
                         </div>
-                        <h2 class="pixel-font text-5xl text-yellow-400 mb-2 leading-none">${map.title}</h2>
-                        <p class="text-gray-400 mb-6 uppercase tracking-widest text-sm font-bold border-b border-white/10 pb-4">${map.theme}</p>
+                        <h2 class="pixel-font text-5xl text-yellow-400 mb-2 leading-none">${map.label}</h2>
+                        <p class="text-gray-400 mb-6 uppercase tracking-widest text-sm font-bold border-b border-white/10 pb-4">${map.week}</p>
                         <div>
-                            <h4 class="pixel-font text-xl text-blue-400 mb-2">The Voyage</h4>
-                            <p class="text-sm text-gray-300 leading-relaxed">${map.challenge}</p>
+                            <h4 class="pixel-font text-xl text-blue-400 mb-2">This Week</h4>
+                            <p class="text-sm text-gray-300 leading-relaxed">${map.about}</p>
                         </div>
                     </div>
                     <div class="lg:col-span-3 flex flex-col gap-6">
@@ -487,7 +396,7 @@
 
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
         window.onload = () => {
-            renderIslands();
+            renderNodes();
             window.onresize = resetView;
         };
     </script>
