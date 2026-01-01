@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Database Quest: World Map</title>
+    <title>Database and Programming Quest: World Map</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -27,10 +27,21 @@
             cursor: grab;
             overflow: hidden;
             position: relative;
-            background: #0f5e9c;
+            background: #106ca3;
         }
 
         #viewport:active { cursor: grabbing; }
+
+        #viewport::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 2px 2px, rgba(255,255,255,0.12) 1px, transparent 0);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
 
 
         /* The World Map Base Image */
@@ -40,12 +51,42 @@
             height: 864px;
             transform-origin: 0 0;
             transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-            background-color: #0f5e9c;
+            background-color: #106ca3;
             background-image: url("assets/world-map.png");
             background-size: 100% 100%;
             background-repeat: no-repeat;
             overflow: hidden;
             z-index: 1;
+        }
+
+        #world-map::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0);
+            background-size: 40px 40px;
+            pointer-events: none;
+        }
+
+        .wave {
+            position: absolute;
+            width: 20px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            animation: drift 4s infinite linear;
+            pointer-events: none;
+        }
+
+        .wave.viewport-wave {
+            z-index: 0;
+        }
+
+        @keyframes drift {
+            0% { transform: translateX(0); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateX(40px); opacity: 0; }
         }
 
 
@@ -67,15 +108,22 @@
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
+        .map-node .node-icon {
+            font-size: 36px;
+            margin-left: 4px;
+        }
+
         .map-node:hover {
             transform: translateY(-4px) scale(1.05);
             box-shadow: 0 12px 0 #3a1600;
             z-index: 20;
         }
 
-        .map-node.boss {
-            background: radial-gradient(circle at 30% 30%, #ffd2a8, #a11a0a 70%);
-            color: #ffe5bf;
+        .map-node.danger {
+            background: radial-gradient(circle at 30% 30%, #ffb39c, #9f1b10 70%);
+            color: #ffe1d6;
+            border-color: #5a120b;
+            box-shadow: 0 8px 0 #5a120b;
         }
 
         /* Sequential Path Styling */
@@ -155,38 +203,14 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Mini-map */
-        #minimap {
-            bottom: 20px;
-            right: 20px;
-            width: 200px;
-            height: 133px;
-            background: rgba(0,0,0,0.8);
-            border: 2px solid #555;
-            overflow: hidden;
-        }
-
-        #minimap-viewport {
-            position: absolute;
-            border: 1px solid #ffd700;
-            background: rgba(255,215,0,0.1);
-        }
-
-        #minimap-content {
-            background-image: url("assets/world-map.png");
-            background-size: 100% 100%;
-            background-repeat: no-repeat;
-            width: 1536px;
-            height: 864px;
-        }
     </style>
 </head>
 <body>
 
     <header class="ui-panel top-0 left-0 w-full p-6 flex justify-between items-center pointer-events-none">
         <div class="pointer-events-auto">
-            <h1 class="pixel-font text-4xl text-yellow-400 drop-shadow-lg">WORLD OF DATA</h1>
-            <p class="text-xs text-gray-200 uppercase tracking-widest font-bold">Chart your course across the digital sea</p>
+            <h1 class="pixel-font text-4xl text-yellow-400 drop-shadow-lg">Database & Programming - World Map</h1>
+            <p class="text-xs text-gray-200 uppercase tracking-widest font-bold">Chart your course across the journey</p>
         </div>
         <div class="flex gap-4 pointer-events-auto">
             <div class="mc-button px-4 flex items-center gap-2">
@@ -209,12 +233,6 @@
         <button onclick="resetView()" class="mc-button text-xs pixel-font h-10">Reset View</button>
     </div>
 
-    <!-- Minimap -->
-    <div id="minimap" class="ui-panel">
-        <div id="minimap-content" class="relative w-full h-full scale-[0.13] origin-top-left"></div>
-        <div id="minimap-viewport"></div>
-    </div>
-
     <!-- Detail Modal -->
     <div id="modal" class="modal-overlay">
         <div class="bg-[#1a1a1a] border-4 border-black w-full max-w-5xl p-6 relative shadow-2xl">
@@ -231,14 +249,16 @@
             { id: 1, label: "L1", x: 402, y: 510, week: "Week 1: Onboarding Island", about: "Set up the tools, access the portal, and make your first successful query.", stars: ["Connect to the platform", "Run your first SQL query", "Submit onboarding checklist"] },
             { id: 2, label: "L2", x: 220, y: 270, week: "Week 2: SQL Kingdom", about: "Explore tables, relationships, and primary keys to navigate the kingdom.", stars: ["Inspect schema diagram", "Filter with WHERE", "Join two tables"] },
             { id: 3, label: "L3", x: 320, y: 270, week: "Week 3: SQL Kingdom", about: "Combine datasets using JOINs and learn to avoid duplicate pitfalls.", stars: ["INNER JOIN mastery", "LEFT JOIN comparisons", "Handle duplicates"] },
-            { id: 4, label: "L4", x: 430, y: 270, week: "Week 4: SQL Kingdom", about: "Level up with aggregation and grouping across the realm.", stars: ["GROUP BY and HAVING", "Aggregate functions", "Order results"] },
-            { id: 5, label: "L5", x: 880, y: 520, week: "Week 5: Python Valley", about: "Clean datasets and automate transformations with Python.", stars: ["Load CSV with pandas", "Clean missing values", "Export cleaned data"] },
-            { id: 6, label: "L6", x: 1000, y: 520, week: "Week 6: Python Valley", about: "Merge data sources and handle exceptions.", stars: ["Merge two datasets", "Handle key errors", "Write reusable functions"] },
-            { id: 7, label: "L7", x: 1120, y: 520, week: "Week 7: Python Valley", about: "Build a mini pipeline that runs end-to-end.", stars: ["Create ETL script", "Schedule a run", "Generate a report"] },
+            { id: 4, label: "L4", x: 430, y: 270, week: "Week 4: SQL Kingdom", about: "Level up with aggregation and grouping across the realm.", stars: ["GROUP BY and HAVING", "Aggregate functions", "Order results"], style: "danger" },
+            { id: 5, label: "L5", x: 1000, y: 520, week: "Week 5: Python Valley", about: "Clean datasets and automate transformations with Python.", stars: ["Load CSV with pandas", "Clean missing values", "Export cleaned data"] },
+            { id: 6, label: "L6", x: 1120, y: 520, week: "Week 6: Python Valley", about: "Merge data sources and handle exceptions.", stars: ["Merge two datasets", "Handle key errors", "Write reusable functions"] },
+            { id: 7, label: "L7", x: 1240, y: 520, week: "Week 7: Python Valley", about: "Build a mini pipeline that runs end-to-end.", stars: ["Create ETL script", "Schedule a run", "Generate a report"], style: "danger" },
             { id: 8, label: "L8", x: 700, y: 360, week: "Week 8: Database Forge", about: "Learn to optimize queries with indexes and explain plans.", stars: ["Identify slow queries", "Add index", "Compare execution plan"] },
             { id: 9, label: "L9", x: 820, y: 360, week: "Week 9: Database Forge", about: "Refactor queries for efficiency and cost.", stars: ["Rewrite heavy query", "Reduce scanned rows", "Document improvements"] },
             { id: 10, label: "L10", x: 940, y: 360, week: "Week 10: Database Forge", about: "Measure performance and enforce limits.", stars: ["Set query timeout", "Monitor performance", "Optimize joins"] },
-            { id: 11, label: "L11", x: 1100, y: 200, week: "Week 11: Final Dungeon", about: "Prepare for the boss stages and finalize your mastery.", stars: ["Boss stage 1 clear", "Boss stage 2 clear", "Final reflection"] }
+            { id: 11, label: "L11", x: 1100, y: 200, week: "Week 11: Final Dungeon", about: "Prepare for the boss stages and finalize your mastery.", stars: ["Boss stage 1 clear", "Boss stage 2 clear", "Final reflection"] },
+            { id: 12, label: "L12", x: 1220, y: 200, week: "Week 12: Final Dungeon", about: "Refine your strategy and polish the final build.", stars: ["Boss stage 3 clear", "Fix remaining issues", "Document results"], style: "danger" },
+            { id: 13, label: "L13", x: 1340, y: 200, week: "Week 13: Final Dungeon", about: "Complete the final showcase and celebrate your mastery.", stars: ["Final demo", "Peer review", "Project showcase"], style: "danger" }
         ];
 
         let scale = 1;
@@ -249,6 +269,29 @@
 
         const worldMap = document.getElementById('world-map');
         const viewport = document.getElementById('viewport');
+
+        function createWaves() {
+            for (let i = 0; i < 80; i++) {
+                const wave = document.createElement('div');
+                wave.className = 'wave';
+                wave.style.left = Math.random() * MAP_WIDTH + 'px';
+                wave.style.top = Math.random() * MAP_HEIGHT + 'px';
+                wave.style.animationDelay = Math.random() * 4 + 's';
+                worldMap.appendChild(wave);
+            }
+        }
+
+        function createViewportWaves() {
+            const waveCount = 60;
+            for (let i = 0; i < waveCount; i++) {
+                const wave = document.createElement('div');
+                wave.className = 'wave viewport-wave';
+                wave.style.left = Math.random() * window.innerWidth + 'px';
+                wave.style.top = Math.random() * window.innerHeight + 'px';
+                wave.style.animationDelay = Math.random() * 4 + 's';
+                viewport.appendChild(wave);
+            }
+        }
 
         function drawPaths() {
             const pathSvg = document.getElementById('paths');
@@ -274,28 +317,23 @@
 
         function updateTransform() {
             worldMap.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
-            updateMinimap();
-        }
-
-        function updateMinimap() {
-            const mv = document.getElementById('minimap-viewport');
-            const mmScale = 200 / MAP_WIDTH;
-            mv.style.width = (window.innerWidth / scale * mmScale) + 'px';
-            mv.style.height = (window.innerHeight / scale * mmScale) + 'px';
-            mv.style.left = (-posX / scale * mmScale) + 'px';
-            mv.style.top = (-posY / scale * mmScale) + 'px';
         }
 
         async function renderNodes() {
+            createWaves();
             drawPaths();
             for (const node of nodes) {
                 const el = document.createElement('button');
                 el.className = 'map-node';
-                if (node.id === 11) el.classList.add('boss');
+                if (node.style) el.classList.add(node.style);
                 el.style.left = node.x + 'px';
                 el.style.top = node.y + 'px';
                 el.setAttribute('aria-label', node.week);
-                el.textContent = node.label;
+                if (node.style === 'danger') {
+                    el.innerHTML = `<span>${node.label}</span><span class="node-icon">&#9760;</span>`;
+                } else {
+                    el.textContent = node.label;
+                }
                 el.onclick = () => openMap(node.id);
                 worldMap.appendChild(el);
 
@@ -401,6 +439,7 @@
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
         window.onload = () => {
             renderNodes();
+            createViewportWaves();
             window.onresize = resetView;
         };
     </script>
