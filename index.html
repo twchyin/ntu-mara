@@ -204,6 +204,404 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
     </style>
+
+    <style>
+  /* ── Modal overlay ── */
+  #l1-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(10, 8, 28, 0.82);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  #l1-modal.open { display: flex; }
+
+  /* ── Modal card ── */
+  .l1-card {
+    background: #1a1535;
+    border: 1.5px solid #4a3f8a;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 680px;
+    max-height: 88vh;
+    overflow-y: auto;
+    position: relative;
+    color: #e8e4ff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    scrollbar-width: thin;
+    scrollbar-color: #4a3f8a #1a1535;
+    animation: slideUp 0.28s cubic-bezier(.22,.68,0,1.2);
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+  }
+
+  /* ── Header banner ── */
+  .l1-header {
+    background: linear-gradient(135deg, #2d2060 0%, #1e1650 50%, #2a1a5e 100%);
+    padding: 2rem 2rem 1.5rem;
+    border-radius: 14px 14px 0 0;
+    border-bottom: 1px solid #3d3278;
+    position: relative;
+    overflow: hidden;
+  }
+  .l1-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 10% 80%, rgba(130,100,255,0.18) 0%, transparent 55%),
+      radial-gradient(circle at 90% 20%, rgba(80,200,180,0.12) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .l1-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #b8a8ff;
+    margin-bottom: 10px;
+  }
+  .l1-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f0ecff;
+    margin: 0 0 4px;
+    line-height: 1.25;
+  }
+  .l1-subtitle {
+    font-size: 14px;
+    color: #9b8fd4;
+    margin: 0;
+  }
+  .l1-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #c0b0ff;
+    border-radius: 8px;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.15s;
+  }
+  .l1-close:hover { background: rgba(255,255,255,0.15); }
+
+  /* ── Stats row ── */
+  .l1-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: #2d2660;
+    border-bottom: 1px solid #3d3278;
+  }
+  .l1-stat {
+    background: #1a1535;
+    padding: 12px 16px;
+    text-align: center;
+  }
+  .l1-stat-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: #c4b0ff;
+  }
+  .l1-stat-label {
+    font-size: 11px;
+    color: #7060a8;
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* ── Body ── */
+  .l1-body { padding: 1.5rem 2rem 2rem; }
+
+  /* ── Section heading ── */
+  .l1-section-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6a5ab0;
+    margin: 1.5rem 0 0.75rem;
+  }
+  .l1-section-head:first-child { margin-top: 0; }
+  .l1-section-head::before {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #2d2660;
+    order: 2;
+  }
+  .l1-section-head span { order: 1; }
+
+  /* ── Agenda list ── */
+  .l1-agenda {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .l1-agenda li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #211d42;
+    border: 1px solid #2d2660;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13.5px;
+    color: #ccc0f8;
+  }
+  .l1-agenda .time-badge {
+    background: #2d2660;
+    color: #9880e8;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── Outcome chips ── */
+  .l1-outcomes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .l1-outcome-chip {
+    background: #211d42;
+    border: 1px solid #3d3278;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: #ccc0f8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .l1-outcome-chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #7c5eff;
+    flex-shrink: 0;
+  }
+
+  /* ── SQL skill cards ── */
+  .l1-skills {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .l1-skill-card {
+    background: #211d42;
+    border: 1px solid #2d2660;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .l1-skill-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #7c5eff;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .l1-skill-code {
+    font-family: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+    font-size: 12px;
+    color: #a8f0c0;
+    background: #14112e;
+    border-radius: 6px;
+    padding: 8px 10px;
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.6;
+    border: 1px solid #1e1a40;
+  }
+  .l1-skill-desc {
+    font-size: 12.5px;
+    color: #9080c0;
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  /* ── Assessment bar ── */
+  .l1-assessment {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .l1-assess-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .l1-assess-label {
+    font-size: 13px;
+    color: #9b8fd4;
+    min-width: 160px;
+    flex-shrink: 0;
+  }
+  .l1-assess-bar {
+    flex: 1;
+    background: #211d42;
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .l1-assess-fill {
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #5b40e8, #8b6aff);
+  }
+  .l1-assess-pct {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c4b0ff;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* ── CTA buttons ── */
+  .l1-cta {
+    display: flex;
+    gap: 10px;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .l1-btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 11px 18px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    border: none;
+    transition: transform 0.12s, opacity 0.12s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+  .l1-btn:hover { transform: translateY(-1px); opacity: 0.9; }
+  .l1-btn:active { transform: scale(0.97); }
+  .l1-btn-primary {
+    background: linear-gradient(135deg, #5b40e8, #7c5eff);
+    color: #fff;
+  }
+  .l1-btn-secondary {
+    background: #211d42;
+    color: #b8a8ff;
+    border: 1px solid #3d3278;
+  }
+  .l1-btn-outline {
+    background: transparent;
+    color: #9b8fd4;
+    border: 1px solid #2d2660;
+  }
+
+  /* ── Scenario card ── */
+  .l1-scenario {
+    background: linear-gradient(135deg, #1e1a40 0%, #241c44 100%);
+    border: 1px solid #3d3278;
+    border-left: 3px solid #7c5eff;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .l1-scenario-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7c5eff;
+    margin-bottom: 6px;
+  }
+  .l1-scenario-text {
+    font-size: 13px;
+    color: #b0a0e0;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* ── Setup steps ── */
+  .l1-setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .l1-setup-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #211d42;
+    border: 1px solid #2d2660;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .l1-step-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #3d3278;
+    color: #c4b0ff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .l1-step-content { flex: 1; }
+  .l1-step-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #ddd0ff;
+    margin-bottom: 2px;
+  }
+  .l1-step-desc {
+    font-size: 12.5px;
+    color: #7060a8;
+    line-height: 1.45;
+  }
+  .l1-step-desc a {
+    color: #8b6aff;
+    text-decoration: none;
+  }
+  .l1-step-desc a:hover { text-decoration: underline; }
+
+  /* Scrollbar */
+  .l1-card::-webkit-scrollbar { width: 6px; }
+  .l1-card::-webkit-scrollbar-track { background: #1a1535; }
+  .l1-card::-webkit-scrollbar-thumb { background: #4a3f8a; border-radius: 3px; }
+
+  /* Mobile */
+  @media (max-width: 500px) {
+    .l1-body { padding: 1.25rem 1.25rem 1.5rem; }
+    .l1-skills { grid-template-columns: 1fr; }
+    .l1-stats { grid-template-columns: repeat(3,1fr); }
+  }
+    </style>
 </head>
 <body>
 
@@ -231,6 +629,124 @@
         <button onclick="changeZoom(0.1)" class="mc-button text-2xl w-12 h-12 flex items-center justify-center">+</button>
         <button onclick="changeZoom(-0.1)" class="mc-button text-2xl w-12 h-12 flex items-center justify-center">-</button>
         <button onclick="resetView()" class="mc-button text-xs pixel-font h-10">Reset View</button>
+    </div>
+
+    <!-- L1 Modal -->
+    <div id="l1-modal" role="dialog" aria-modal="true" aria-labelledby="l1-modal-title">
+      <div class="l1-card">
+        <div class="l1-header">
+          <button class="l1-close" onclick="closeL1Modal()" aria-label="Close">✕</button>
+          <div class="l1-badge">🏝️ Onboarding Island &nbsp;·&nbsp; Lesson 1</div>
+          <h2 class="l1-title" id="l1-modal-title">Introduction & SQL Basics</h2>
+          <p class="l1-subtitle">Database &amp; Programming for Actuarial and Risk Analyst · Week 1</p>
+        </div>
+        <div class="l1-stats">
+          <div class="l1-stat"><div class="l1-stat-val">3</div><div class="l1-stat-label">SQL Skills</div></div>
+          <div class="l1-stat"><div class="l1-stat-val">3h</div><div class="l1-stat-label">Session</div></div>
+          <div class="l1-stat"><div class="l1-stat-val">4</div><div class="l1-stat-label">Exercises</div></div>
+        </div>
+        <div class="l1-body">
+          <div class="l1-section-head"><span>🎯 Today's learning outcomes</span></div>
+          <div class="l1-outcomes">
+            <div class="l1-outcome-chip"><span class="dot"></span>Why use databases &amp; SQL</div>
+            <div class="l1-outcome-chip"><span class="dot"></span>Types of databases</div>
+            <div class="l1-outcome-chip"><span class="dot"></span>Read &amp; filter tables</div>
+            <div class="l1-outcome-chip"><span class="dot"></span>Sanity-check data</div>
+          </div>
+          <div class="l1-section-head"><span>📋 Agenda</span></div>
+          <ul class="l1-agenda">
+            <li><span class="time-badge">60 min</span>Intro to class — get to know each other</li>
+            <li><span class="time-badge">15 min</span>Tools setup &amp; break</li>
+            <li><span class="time-badge">45 min</span>SQL — why SQL and reading tables</li>
+            <li><span class="time-badge">15 min</span>Exercise / optional break</li>
+            <li><span class="time-badge">45 min</span>SQL — filtering and business scenarios</li>
+            <li><span class="time-badge">15 min</span>Reflection</li>
+          </ul>
+          <div class="l1-section-head"><span>⚔️ SQL skills unlocked</span></div>
+          <div class="l1-skills">
+            <div class="l1-skill-card">
+              <div class="l1-skill-title">Skill #1 · Read table</div>
+              <div class="l1-skill-code">SELECT col1, col2
+FROM table_name
+LIMIT 10;</div>
+              <div class="l1-skill-desc">Peek at any table — see its shape, columns, and data types.</div>
+            </div>
+            <div class="l1-skill-card">
+              <div class="l1-skill-title">Skill #2 · Alias</div>
+              <div class="l1-skill-code">SELECT col1 AS label
+FROM table AS t
+LIMIT 10;</div>
+              <div class="l1-skill-desc">Rename columns and tables in output for cleaner reads.</div>
+            </div>
+            <div class="l1-skill-card" style="grid-column: 1 / -1;">
+              <div class="l1-skill-title">Skill #3 · Filter rows</div>
+              <div class="l1-skill-code">SELECT "TRANSACTION_ID", "CLAIM_AMOUNT"
+FROM insurance_data
+WHERE "CLAIM_AMOUNT" >= 100000;</div>
+              <div class="l1-skill-desc">Use WHERE to slice data to exactly the rows that matter for your business question.</div>
+            </div>
+          </div>
+          <div class="l1-section-head"><span>🕵️ Real-world scenario</span></div>
+          <div class="l1-scenario">
+            <div class="l1-scenario-title">Data Audit &amp; Inventory — Insurance Firm</div>
+            <p class="l1-scenario-text">You've just joined as a Junior Data Analyst. Your manager hands you three new databases — Insurance Claims, Employee Records, Vendor Info — with no manual. Your job: profile the data, identify what each row represents, and break down the column types (dates, numbers, text).</p>
+          </div>
+          <div class="l1-section-head"><span>🛠️ Setup checklist</span></div>
+          <div class="l1-setup-steps">
+            <div class="l1-setup-step">
+              <div class="l1-step-num">1</div>
+              <div class="l1-step-content">
+                <div class="l1-step-title">Install VS Code</div>
+                <div class="l1-step-desc">Download from <a href="https://code.visualstudio.com/download" target="_blank">code.visualstudio.com/download</a></div>
+              </div>
+            </div>
+            <div class="l1-setup-step">
+              <div class="l1-step-num">2</div>
+              <div class="l1-step-content">
+                <div class="l1-step-title">Install SQLTools extension</div>
+                <div class="l1-step-desc">Extensions tab → search SQLTools → install SQLTools + PostgreSQL/CockroachDB driver</div>
+              </div>
+            </div>
+            <div class="l1-setup-step">
+              <div class="l1-step-num">3</div>
+              <div class="l1-step-content">
+                <div class="l1-step-title">Create a GitHub account</div>
+                <div class="l1-step-desc">Go to <a href="https://github.com" target="_blank">github.com</a> and sign up — you'll use this for your portfolio</div>
+              </div>
+            </div>
+            <div class="l1-setup-step">
+              <div class="l1-step-num">4</div>
+              <div class="l1-step-content">
+                <div class="l1-step-title">Connect to the class database</div>
+                <div class="l1-step-desc">In SQLTools → Add New Connection → PostgreSQL driver → use the connection string shared in class</div>
+              </div>
+            </div>
+          </div>
+          <div class="l1-section-head"><span>📊 Course assessment</span></div>
+          <div class="l1-assessment">
+            <div class="l1-assess-row">
+              <div class="l1-assess-label">Class participation (weekly labs)</div>
+              <div class="l1-assess-bar"><div class="l1-assess-fill" style="width:20%"></div></div>
+              <div class="l1-assess-pct">20%</div>
+            </div>
+            <div class="l1-assess-row">
+              <div class="l1-assess-label">Quiz (Week 4 &amp; Week 7)</div>
+              <div class="l1-assess-bar"><div class="l1-assess-fill" style="width:30%"></div></div>
+              <div class="l1-assess-pct">30%</div>
+            </div>
+            <div class="l1-assess-row">
+              <div class="l1-assess-label">Final group project</div>
+              <div class="l1-assess-bar"><div class="l1-assess-fill" style="width:50%"></div></div>
+              <div class="l1-assess-pct">50%</div>
+            </div>
+          </div>
+          <div class="l1-cta">
+            <a href="https://docs.google.com/presentation/d/1zHYuoy77czuHgMZP8HAeVf-DmYqH_E5-NO4NbVlcaFs/edit" target="_blank" class="l1-btn l1-btn-primary">📊 Open Week 1 Slides</a>
+            <a href="https://codeshare.io/5Ol9Jr" target="_blank" class="l1-btn l1-btn-secondary">📓 Demo Notebook</a>
+            <button class="l1-btn l1-btn-outline" onclick="closeL1Modal()">Close</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Detail Modal -->
@@ -334,7 +850,7 @@
                 } else {
                     el.textContent = node.label;
                 }
-                el.onclick = () => openMap(node.id);
+                el.onclick = () => node.id === 1 ? openL1Modal() : openMap(node.id);
                 worldMap.appendChild(el);
 
                 await new Promise(r => setTimeout(r, 50));
@@ -437,6 +953,26 @@
         }
 
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+        function openL1Modal() {
+            const modal = document.getElementById('l1-modal');
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            modal.querySelector('.l1-card').scrollTop = 0;
+        }
+
+        function closeL1Modal() {
+            document.getElementById('l1-modal').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('l1-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeL1Modal();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeL1Modal();
+        });
         window.onload = () => {
             renderNodes();
             createViewportWaves();
