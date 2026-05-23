@@ -9,9 +9,16 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Sync to HF Hub
-        uses: huggingface/hub-sync@v1
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          huggingface_token: ${{ secrets.HF_TOKEN }}
-          huggingface_repo_id: twchyin/MARA_map
-          huggingface_repo_type: space
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git push --force \
+            https://twchyin:${HF_TOKEN}@huggingface.co/spaces/twchyin/MARA_map \
+            main:main
