@@ -24,4 +24,9 @@ jobs:
           git config user.name "GitHub Actions"
           git remote add huggingface \
             https://twchyin:${HF_TOKEN}@huggingface.co/spaces/twchyin/MARA_map
-          git push huggingface HEAD:main --force --verbose
+
+          # Create a single orphan commit containing only the current tree.
+          # This strips all git history so HF never sees commits that had PNGs.
+          TREE=$(git rev-parse HEAD^{tree})
+          COMMIT=$(git commit-tree "$TREE" -m "Sync from GitHub ($(git rev-parse --short HEAD))")
+          git push huggingface "${COMMIT}:refs/heads/main" --force --verbose
