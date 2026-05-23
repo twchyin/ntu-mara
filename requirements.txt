@@ -1,0 +1,7 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+gspread>=5.12.4
+google-auth>=2.23.0
+httpx>=0.25.0
+itsdangerous>=2.1.2
+python-multipart>=0.0.6

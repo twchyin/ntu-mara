@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NTU MARA Quest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a1a;
+      font-family: 'Press Start 2P', monospace;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      overflow-x: hidden;
+    }
+
+    /* ── HUD ── */
+    #hud {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #111122;
+      border-bottom: 4px solid #333355;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    #hud-title { font-size: 9px; color: #FFD700; letter-spacing: 1px; }
+    #hud-user  { font-size: 8px; color: #87CEEB; }
+    #hud-score { font-size: 8px; color: #FFD700; }
+
+    /* ── Game canvas wrapper ── */
+    #game-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 960px;
+    }
+    #c {
+      display: block;
+      width: 100%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border-left: 4px solid #333355;
+      border-right: 4px solid #333355;
+      border-bottom: 4px solid #333355;
+      cursor: default;
+    }
+    #key-hints {
+      text-align: center;
+      font-size: 7px;
+      color: #556;
+      padding: 6px 0 10px;
+      letter-spacing: 1px;
+    }
+
+    /* ── Loading / Login screens ── */
+    #screen-loading, #screen-login {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 40px 20px;
+      min-height: 300px;
+      text-align: center;
+    }
+    #screen-loading p, #screen-login p { font-size: 10px; color: #aaa; }
+    .blink { animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Modal overlay ── */
+    #modal-wrap {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.88);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    #modal-wrap.open { display: flex; }
+    #modal-box {
+      max-width: 580px;
+      width: 100%;
+      max-height: 92vh;
+      overflow-y: auto;
+      background: #0d0d1e;
+      border: 4px solid #fff;
+      /* NES-style thick pixel border shadow */
+      box-shadow: 4px 4px 0 #444, 8px 8px 0 #222;
+      padding: 0;
+    }
+    #modal-box::-webkit-scrollbar { width: 6px; }
+    #modal-box::-webkit-scrollbar-thumb { background: #444; }
+
+    .modal-header {
+      background: #1a1a3a;
+      border-bottom: 4px solid #333;
+      padding: 16px 18px 12px;
+    }
+    .modal-week   { font-size: 13px; color: #FFD700; margin-bottom: 4px; }
+    .modal-theme  { font-size: 9px;  color: #87CEEB; }
+    .modal-body   { padding: 16px 18px 18px; }
+
+    .section-label {
+      font-size: 8px;
+      color: #888;
+      letter-spacing: 2px;
+      border-bottom: 2px solid #222;
+      padding-bottom: 4px;
+      margin: 14px 0 10px;
+    }
+    .section-label:first-child { margin-top: 0; }
+
+    .obj-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .obj-list li {
+      font-size: 8px;
+      color: #ccc;
+      background: #111;
+      border-left: 3px solid #4CAF50;
+      padding: 7px 10px;
+      line-height: 1.7;
+    }
+    .obj-list li::before { content: "▶ "; color: #4CAF50; }
+
+    .score-box {
+      background: #111;
+      border: 2px solid #333;
+      padding: 14px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .score-label  { font-size: 7px; color: #888; letter-spacing: 2px; }
+    .score-value  { font-size: 22px; color: #FFD700; line-height: 1; }
+    .score-denom  { font-size: 11px; color: #888; }
+    .star-row     { font-size: 20px; line-height: 1; letter-spacing: 2px; }
+    .star-full    { color: #FFD700; }
+    .star-empty   { color: #444; }
+
+    .no-score-msg { font-size: 9px; color: #555; font-style: italic; }
+    .locked-msg   { font-size: 9px; color: #666; }
+
+    .nes-progress { width: 100%; height: 14px; margin-top: 4px; }
+
+    .modal-footer {
+      border-top: 4px solid #222;
+      padding: 12px 18px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    /* NES.css overrides */
+    .nes-btn { font-family: 'Press Start 2P', monospace !important; font-size: 9px !important; }
+    .nes-btn.is-success { background: #2d8a2d; border-color: #1a5c1a; }
+  </style>
+</head>
+<body>
+
+<!-- HUD -->
+<div id="hud">
+  <span id="hud-title">★ NTU MARA QUEST ★</span>
+  <span id="hud-user">...</span>
+  <span id="hud-score">— pts</span>
+</div>
+
+<!-- Loading -->
+<div id="screen-loading" style="display:flex">
+  <p class="blink">LOADING QUEST DATA...</p>
+</div>
+
+<!-- Login prompt -->
+<div id="screen-login">
+  <p style="font-size:14px;color:#FFD700">🔐 LOGIN REQUIRED</p>
+  <p>Sign in with your HuggingFace account to view your progress.</p>
+  <br/>
+  <a href="/login" class="nes-btn is-primary">▶ LOGIN WITH HUGGINGFACE</a>
+</div>
+
+<!-- Game -->
+<div id="game-wrap" style="display:none">
+  <canvas id="c" width="960" height="540"></canvas>
+  <div id="key-hints">← → MOVE &nbsp;|&nbsp; ENTER / SPACE INSPECT &nbsp;|&nbsp; CLICK NODE TO INSPECT</div>
+</div>
+
+<!-- Modal -->
+<div id="modal-wrap" role="dialog" aria-modal="true">
+  <div id="modal-box">
+    <div class="modal-header">
+      <div class="modal-week" id="m-week"></div>
+      <div class="modal-theme" id="m-theme"></div>
+    </div>
+    <div class="modal-body">
+      <div class="section-label">📚 LEARNING OBJECTIVES</div>
+      <ul class="obj-list" id="m-objectives"></ul>
+      <div class="section-label">🏆 YOUR SCORE</div>
+      <div class="score-box" id="m-score"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="nes-btn is-normal" onclick="closeModal()">✕ CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  Constants
+// ══════════════════════════════════════════════════════════════════
+const CW = 960, CH = 540;   // canvas logical size
+const NR = 22;               // node circle radius
+
+// 11 node centres laid out as an S-curve: bottom-left → top-right
+const NODES = [
+  {x:115, y:450},   // W1
+  {x:235, y:450},   // W2
+  {x:355, y:450},   // W3
+  {x:475, y:450},   // W4  (quiz)
+  {x:595, y:450},   // W5
+  {x:720, y:360},   // W6
+  {x:820, y:255},   // W7  (quiz)
+  {x:710, y:150},   // W8
+  {x:575, y:110},   // W9
+  {x:420, y:100},   // W10
+  {x:255, y:88},    // W11
+];
+
+// Static decorative trees (pixel art, drawn as trunk + canopy)
+const TREES = [
+  {x:45,  y:210},{x:70, y:235},{x:55, y:265},
+  {x:900, y:200},{x:920,y:225},{x:905,y:250},
+  {x:160, y:310},{x:185,y:330},
+  {x:760, y:310},{x:785,y:330},
+  {x:460, y:220},{x:490,y:240},
+  {x:620, y:205},{x:645,y:230},
+  {x:75,  y:390},{x:55, y:415},
+  {x:875, y:400},{x:855,y:420},
+  {x:300, y:360},{x:325,y:375},
+  {x:530, y:370},{x:555,y:350},
+];
+
+// Clouds: x,y,w,speed
+const CLOUDS = [
+  {x: 90,  y:22, w:80, s:.28},
+  {x: 310, y:40, w:60, s:.18},
+  {x: 530, y:18, w:90, s:.35},
+  {x: 730, y:38, w:70, s:.22},
+  {x: 920, y:28, w:55, s:.30},
+];
+
+// Pixel-art player sprite (8×12 @ 2×scale = 16×24)
+// 0=transparent 1=hair 2=skin 3=eye 4=shirt 5=pants 6=shoe
+const SPR = [
+  [0,1,1,1,1,1,0,0],
+  [1,1,1,1,1,1,1,0],
+  [0,2,2,2,2,2,2,0],
+  [0,2,3,2,2,3,2,0],
+  [0,2,2,2,2,2,2,0],
+  [0,2,2,2,2,2,2,0],
+  [0,4,4,4,4,4,4,0],
+  [4,4,4,4,4,4,4,4],
+  [4,4,4,4,4,4,4,4],
+  [0,5,5,0,0,5,5,0],
+  [5,5,5,0,0,5,5,5],
+  [6,6,0,0,0,0,6,6],
+];
+const SPR_COLORS = {
+  1: '#5D4037', 2: '#FFCC80', 3: '#1565C0',
+  4: '#1976D2', 5: '#2E7D32', 6: '#4E342E',
+};
+
+// ══════════════════════════════════════════════════════════════════
+//  State
+// ══════════════════════════════════════════════════════════════════
+let weeks   = [];
+let cur     = 0;      // current node index
+let frame   = 0;
+let username = '';
+
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// ══════════════════════════════════════════════════════════════════
+//  Drawing helpers
+// ══════════════════════════════════════════════════════════════════
+function sky() {
+  const g = ctx.createLinearGradient(0, 0, 0, 135);
+  g.addColorStop(0, '#3a8fce');
+  g.addColorStop(1, '#7ec8e3');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, CW, 135);
+}
+
+function mountains() {
+  const peaks = [
+    {x:60,  y:135, w:180, col:'#6e84b0'},
+    {x:200, y:135, w:140, col:'#7a8fc0'},
+    {x:390, y:135, w:200, col:'#6e84b0'},
+    {x:610, y:135, w:170, col:'#7a8fc0'},
+    {x:790, y:135, w:200, col:'#6e84b0'},
+  ];
+  peaks.forEach(({x,y,w,col}) => {
+    const tip = {x: x + w/2, y: y - w * .45};
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(tip.x, tip.y); ctx.lineTo(x+w, y);
+    ctx.closePath(); ctx.fill();
+    // snow cap
+    const sw = w * .13;
+    ctx.fillStyle = '#dce8f0';
+    ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(tip.x - sw, tip.y + sw * 1.6);
+    ctx.lineTo(tip.x + sw, tip.y + sw * 1.6);
+    ctx.closePath(); ctx.fill();
+  });
+}
+
+function grassField() {
+  const g = ctx.createLinearGradient(0, 118, 0, CH);
+  g.addColorStop(0, '#5cb85c');
+  g.addColorStop(.6, '#4a9e4a');
+  g.addColorStop(1, '#3d8a3d');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 118, CW, CH - 118);
+
+  // darker patches for depth
+  ctx.fillStyle = 'rgba(0,60,0,.18)';
+  [{x:0,   y:220, w:90,  h:320},
+   {x:875, y:210, w:85,  h:330},
+   {x:160, y:380, w:120, h:160},
+   {x:700, y:390, w:140, h:150},
+   {x:430, y:210, w:70,  h:120},
+   {x:580, y:200, w:80,  h:130},
+  ].forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+}
+
+function tree(x, y) {
+  ctx.fillStyle = '#5D4037';
+  ctx.fillRect(x - 3, y, 6, 14);
+  ctx.fillStyle = '#1B5E20';
+  ctx.beginPath(); ctx.arc(x, y - 5, 13, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#2E7D32';
+  ctx.beginPath(); ctx.arc(x - 3, y - 10, 9, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#388E3C';
+  ctx.beginPath(); ctx.arc(x + 3, y - 8, 7, 0, Math.PI*2); ctx.fill();
+}
+
+function cloud({x, y, w}) {
+  ctx.fillStyle = 'rgba(255,255,255,.82)';
+  [
+    {dx:0,     dy:0,    r: w*.28},
+    {dx:w*.22, dy:-w*.06, r: w*.2},
+    {dx:w*.44, dy:0,    r: w*.24},
+    {dx:w*.62, dy:.04*w,r: w*.16},
+  ].forEach(({dx,dy,r}) => {
+    ctx.beginPath(); ctx.arc(x+dx, y+dy, r, 0, Math.PI*2); ctx.fill();
+  });
+}
+
+function paths() {
+  ctx.save();
+  for (let i = 0; i < NODES.length - 1; i++) {
+    const unlocked = (weeks[i] || {}).admin_step === 1;
+    const p1 = NODES[i], p2 = NODES[i+1];
+
+    // Dirt strip
+    ctx.strokeStyle = unlocked ? '#b8903e' : '#696969';
+    ctx.lineWidth   = 16;
+    ctx.lineCap     = 'round';
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+
+    // Highlight centre
+    ctx.strokeStyle = unlocked ? 'rgba(240,210,120,.4)' : 'rgba(200,200,200,.15)';
+    ctx.lineWidth   = 5;
+    ctx.setLineDash([10, 8]);
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function nodes() {
+  weeks.forEach((w, i) => {
+    const {x, y} = NODES[i];
+    const locked    = w.admin_step === 0;
+    const completed = w.user_score != null && w.user_score > 0;
+    const isCur     = i === cur;
+    const pulse     = Math.sin(frame * .07) * 8;
+
+    // Glow ring for current node
+    if (isCur) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,255,255,.9)';
+      ctx.shadowBlur  = 18 + pulse;
+      ctx.beginPath(); ctx.arc(x, y, NR + 5, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,255,255,.85)';
+      ctx.lineWidth   = 3; ctx.stroke();
+      ctx.restore();
+    }
+
+    // Node fill
+    ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI*2);
+    if (locked) {
+      ctx.fillStyle = '#3a3a3a';
+    } else if (completed) {
+      const g = ctx.createRadialGradient(x-4, y-4, 2, x, y, NR);
+      g.addColorStop(0, '#FFE082'); g.addColorStop(1, '#E65100');
+      ctx.fillStyle = g;
+    } else {
+      const g = ctx.createRadialGradient(x-4, y-4, 2, x, y, NR);
+      g.addColorStop(0, '#81C784'); g.addColorStop(1, '#1B5E20');
+      ctx.fillStyle = g;
+    }
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = locked ? '#555' : (completed ? '#FFD700' : '#145214');
+    ctx.lineWidth   = 3; ctx.stroke();
+
+    // Label
+    ctx.fillStyle    = locked ? '#777' : '#fff';
+    ctx.font         = `bold ${i < 9 ? 9 : 8}px "Press Start 2P"`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`W${i+1}`, x, y);
+
+    // Star strip below node (only for small max_points)
+    if (!locked && w.max_points > 0 && w.max_points <= 5) {
+      const score = w.user_score || 0;
+      let s = '';
+      for (let k = 0; k < w.max_points; k++) s += k < score ? '★' : '☆';
+      ctx.font         = '9px sans-serif';
+      ctx.fillStyle    = completed ? '#FFD700' : '#888';
+      ctx.textAlign    = 'center';
+      ctx.fillText(s, x, y + NR + 11);
+    }
+  });
+}
+
+function player() {
+  const {x, y} = NODES[cur];
+  const bob = Math.sin(frame * .08) * 3;
+  const ps  = 2;  // pixel scale
+  const pw  = SPR[0].length * ps;
+  const ph  = SPR.length    * ps;
+  const px  = Math.round(x - pw / 2);
+  const py  = Math.round(y - NR - ph - 4 + bob);
+
+  SPR.forEach((row, ri) =>
+    row.forEach((c, ci) => {
+      if (!c) return;
+      ctx.fillStyle = SPR_COLORS[c];
+      ctx.fillRect(px + ci * ps, py + ri * ps, ps, ps);
+    })
+  );
+
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,.25)';
+  ctx.beginPath();
+  ctx.ellipse(x, y - NR - 2, 10, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function oceanShimmer() {
+  for (let i = 0; i < 5; i++) {
+    const yy = ((frame * .6 + i * 55) % (CH + 40)) - 20;
+    const a  = .03 + .03 * Math.sin(frame * .03 + i * 1.1);
+    ctx.fillStyle = `rgba(180,220,255,${a})`;
+    ctx.fillRect(0, yy, CW, 2);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  Animation loop
+// ══════════════════════════════════════════════════════════════════
+function tick() {
+  frame++;
+  CLOUDS.forEach(c => { c.x += c.s; if (c.x - c.w > CW) c.x = -c.w; });
+
+  ctx.clearRect(0, 0, CW, CH);
+  sky();
+  mountains();
+  grassField();
+  oceanShimmer();
+  CLOUDS.forEach(cloud);
+  paths();
+  TREES.forEach(t => tree(t.x, t.y));
+  nodes();
+  player();
+
+  requestAnimationFrame(tick);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  Input
+// ══════════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (document.getElementById('modal-wrap').classList.contains('open')) {
+    if (e.key === 'Escape') { closeModal(); e.preventDefault(); }
+    return;
+  }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    if (cur < weeks.length - 1) cur++;
+    e.preventDefault();
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    if (cur > 0) cur--;
+    e.preventDefault();
+  } else if (e.key === 'Enter' || e.key === ' ') {
+    openModal(cur); e.preventDefault();
+  }
+});
+
+// Click on canvas → hit-test nodes
+canvas.addEventListener('click', e => {
+  const rect  = canvas.getBoundingClientRect();
+  const scaleX = CW / rect.width;
+  const scaleY = CH / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top)  * scaleY;
+  for (let i = 0; i < NODES.length; i++) {
+    const {x, y} = NODES[i];
+    if ((mx-x)**2 + (my-y)**2 <= (NR+4)**2) { cur = i; openModal(i); break; }
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  Modal
+// ══════════════════════════════════════════════════════════════════
+function openModal(idx) {
+  const w = weeks[idx];
+  if (!w) return;
+
+  document.getElementById('m-week').textContent  = w.week  || `Week ${idx+1}`;
+  document.getElementById('m-theme').textContent = w.theme || '';
+
+  // Objectives
+  const rawObjs = (w.objectives || '').replace(/\r/g, '');
+  const lines = rawObjs
+    .split('\n')
+    .map(l => l.replace(/^[\s•\-\*\d\.]+/, '').trim())
+    .filter(l => l.length > 0);
+
+  const objEl = document.getElementById('m-objectives');
+  if (lines.length) {
+    objEl.innerHTML = lines.map(l => `<li>${escHtml(l)}</li>`).join('');
+  } else {
+    objEl.innerHTML = '<li style="color:#555;font-style:italic">No objectives listed</li>';
+  }
+
+  // Score
+  const scoreEl = document.getElementById('m-score');
+  const locked  = w.admin_step === 0;
+  const mp      = w.max_points;
+  const sc      = w.user_score;
+
+  if (locked) {
+    scoreEl.innerHTML = `<p class="locked-msg">🔒 NOT YET UNLOCKED</p>`;
+  } else if (!mp) {
+    scoreEl.innerHTML = `<p class="no-score-msg">No assessment this week</p>`;
+  } else if (mp <= 5) {
+    // Star display
+    let stars = '';
+    for (let k = 0; k < mp; k++) {
+      stars += `<span class="${k < (sc||0) ? 'star-full' : 'star-empty'}">★</span>`;
+    }
+    const got = sc != null ? sc : '?';
+    scoreEl.innerHTML = `
+      <div class="score-label">YOUR SCORE</div>
+      <div class="star-row">${stars}</div>
+      <div style="font-size:8px;color:#888">${got} / ${mp} pts</div>`;
+  } else {
+    // Numerical + progress bar
+    const got = sc != null ? sc : null;
+    const pct = (got != null && mp) ? Math.round(got / mp * 100) : 0;
+    const barClass = pct >= 80 ? 'is-success' : pct >= 50 ? 'is-warning' : 'is-error';
+    scoreEl.innerHTML = `
+      <div class="score-label">YOUR SCORE</div>
+      <div>
+        <span class="score-value">${got != null ? got : '—'}</span>
+        <span class="score-denom"> / ${mp} pts</span>
+      </div>
+      ${got != null
+        ? `<progress class="nes-progress ${barClass}" value="${got}" max="${mp}"></progress>
+           <div style="font-size:8px;color:#888">${pct}%</div>`
+        : '<div style="font-size:8px;color:#555">Score not recorded</div>'}`;
+  }
+
+  document.getElementById('modal-wrap').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-wrap').classList.remove('open');
+}
+
+document.getElementById('modal-wrap').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-wrap')) closeModal();
+});
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  Data loading
+// ══════════════════════════════════════════════════════════════════
+async function init() {
+  try {
+    const res  = await fetch('/api/syllabus-data');
+
+    if (res.status === 401) {
+      document.getElementById('screen-loading').style.display = 'none';
+      document.getElementById('screen-login').style.display   = 'flex';
+      return;
+    }
+
+    if (!res.ok) {
+      document.getElementById('screen-loading').innerHTML =
+        `<p style="color:#f66">Error ${res.status}: Could not load data.</p>`;
+      return;
+    }
+
+    const data = await res.json();
+    username   = data.username || 'Guest';
+    weeks      = (data.weeks || []).slice(0, NODES.length);
+
+    // Pad missing weeks so NODES always has a matching entry
+    while (weeks.length < NODES.length) {
+      weeks.push({week:`Week ${weeks.length+1}`, theme:'', objectives:'', max_points:0, admin_step:0, user_score:null});
+    }
+
+    // HUD
+    document.getElementById('hud-user').textContent = `👤 ${username.toUpperCase()}`;
+    const tot = weeks.reduce((s,w) => s + (w.user_score || 0), 0);
+    const max = weeks.reduce((s,w) => s + (w.max_points || 0), 0);
+    document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
+
+    if (!data.user_col_found && username !== 'dev') {
+      document.getElementById('hud-score').textContent += '  ⚠ name not in sheet';
+    }
+
+    document.getElementById('screen-loading').style.display = 'none';
+    document.getElementById('game-wrap').style.display      = 'block';
+
+    requestAnimationFrame(tick);
+
+  } catch (err) {
+    document.getElementById('screen-loading').innerHTML =
+      `<p style="color:#f66">Failed to load: ${escHtml(String(err))}</p>`;
+    console.error(err);
+  }
+}
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
