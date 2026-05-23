@@ -1,0 +1,17 @@
+name: Sync to Hugging Face Space
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync to HF Hub
+        uses: huggingface/hub-sync@v1
+        with:
+          huggingface_token: ${{ secrets.HF_TOKEN }}
+          huggingface_repo_id: twchyin/MARA_map
+          huggingface_repo_type: space
