@@ -29,6 +29,21 @@ HF_AUTH_URL = "https://huggingface.co/oauth/authorize"
 HF_TOKEN_URL = "https://huggingface.co/oauth/token"
 HF_USERINFO_URL = "https://huggingface.co/oauth/userinfo"
 
+# ── Fallback dataset (used when Sheets is unreachable) ────────────
+MOCK_WEEKS = [
+    {"week": "Week 1",  "theme": "Intro & SQL Basics",         "objectives": "Install VS Code & SQLTools\nRead tables with SELECT / FROM / LIMIT\nFilter rows with WHERE and alias columns", "max_points": 3, "admin_step": 1, "user_score": None},
+    {"week": "Week 2",  "theme": "Joins & Relationships",      "objectives": "Understand primary & foreign keys\nWrite INNER JOIN queries\nCompare LEFT vs INNER JOIN results",             "max_points": 2, "admin_step": 1, "user_score": None},
+    {"week": "Week 3",  "theme": "Aggregation & Grouping",     "objectives": "Use GROUP BY and HAVING\nApply aggregate functions (SUM, AVG, COUNT)\nOrder and limit grouped results",        "max_points": 2, "admin_step": 1, "user_score": None},
+    {"week": "Week 4",  "theme": "SQL Quiz",                   "objectives": "Quiz covering Weeks 1–3 SQL skills",                                                                           "max_points": 15, "admin_step": 1, "user_score": None},
+    {"week": "Week 5",  "theme": "Python & pandas Basics",     "objectives": "Load CSV data with pandas\nClean missing values\nExport cleaned datasets",                                    "max_points": 2, "admin_step": 1, "user_score": None},
+    {"week": "Week 6",  "theme": "Merging & Exception Handling","objectives": "Merge two DataFrames\nHandle KeyError and missing columns\nWrite reusable helper functions",                "max_points": 2, "admin_step": 1, "user_score": None},
+    {"week": "Week 7",  "theme": "ETL Pipeline",               "objectives": "Build an end-to-end ETL script\nSchedule a pipeline run\nGenerate a summary report",                         "max_points": 15, "admin_step": 0, "user_score": None},
+    {"week": "Week 8",  "theme": "Query Optimisation",         "objectives": "Identify slow queries with EXPLAIN\nAdd indexes to speed up lookups\nCompare before/after execution plans",   "max_points": 2, "admin_step": 0, "user_score": None},
+    {"week": "Week 9",  "theme": "Database Design",            "objectives": "Normalise a schema to 3NF\nDesign an ER diagram\nImplement constraints and foreign keys",                    "max_points": 2, "admin_step": 0, "user_score": None},
+    {"week": "Week 10", "theme": "Performance & Monitoring",   "objectives": "Set query timeouts\nMonitor slow-query logs\nOptimise multi-table joins",                                     "max_points": 2, "admin_step": 0, "user_score": None},
+    {"week": "Week 11", "theme": "Final Project",              "objectives": "Present end-to-end data pipeline\nPeer code review\nFinal portfolio showcase",                                "max_points": 3, "admin_step": 0, "user_score": None},
+]
+
 # ── Helpers ──────────────────────────────────────────────────────
 
 def _redirect_uri(request: Request) -> str:
@@ -58,12 +73,17 @@ def _current_user(request: Request) -> Optional[str]:
 
 def _worksheet():
     if not GOOGLE_SERVICE_ACCOUNT_JSON:
-        raise HTTPException(503, "GOOGLE_SERVICE_ACCOUNT_JSON not set")
+        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON env var is not set")
     if not GOOGLE_SHEET_ID:
-        raise HTTPException(503, "GOOGLE_SHEET_ID not set")
-    creds = Credentials.from_service_account_info(
-        json.loads(GOOGLE_SERVICE_ACCOUNT_JSON), scopes=SCOPES
-    )
+        raise ValueError("GOOGLE_SHEET_ID env var is not set")
+
+    try:
+        creds_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+    except json.JSONDecodeError as exc:
+        print("ERROR: Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON secret.", flush=True)
+        raise exc
+
+    creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
     gc = gspread.authorize(creds)
     return gc.open_by_key(GOOGLE_SHEET_ID).worksheet(GOOGLE_SHEET_TAB)
 
@@ -168,16 +188,26 @@ async def syllabus_data(request: Request):
     if not username and OAUTH_CLIENT_ID:
         raise HTTPException(401, "Not authenticated")
 
+    # ── Fetch rows from Google Sheets ────────────────────────────
+    rows: list = []
+    sheet_error: str = ""
     try:
         ws = _worksheet()
         rows = ws.get_all_values()
-    except HTTPException:
-        raise
     except Exception as exc:
-        raise HTTPException(503, f"Sheet read error: {exc}") from exc
+        print(f"ERROR: Failed to fetch from Google Sheets API: {exc}", flush=True)
+        sheet_error = str(exc)
 
-    if not rows:
-        return JSONResponse({"username": username or "dev", "weeks": [], "user_col_found": False})
+    # ── Graceful fallback to mock data when Sheets is unavailable ─
+    if sheet_error or not rows:
+        mock = [dict(w) for w in MOCK_WEEKS]   # shallow copy so originals stay clean
+        return JSONResponse({
+            "username": username or "dev",
+            "weeks": mock,
+            "user_col_found": False,
+            "fallback": True,
+            "fallback_reason": sheet_error or "Sheet returned no data",
+        })
 
     headers = rows[0]
 
@@ -187,11 +217,11 @@ async def syllabus_data(request: Request):
                 return i
         return None
 
-    week_i = col("Week") if col("Week") is not None else 0
-    theme_i = col("Theme") if col("Theme") is not None else 1
-    obj_i = col("Learning objectives") if col("Learning objectives") is not None else 2
-    max_i = col("Max Points") if col("Max Points") is not None else 3
-    admin_i = col("Admin Step") if col("Admin Step") is not None else 4
+    week_i  = col("Week")                if col("Week")                is not None else 0
+    theme_i = col("Theme")               if col("Theme")               is not None else 1
+    obj_i   = col("Learning objectives") if col("Learning objectives") is not None else 2
+    max_i   = col("Max Points")          if col("Max Points")          is not None else 3
+    admin_i = col("Admin Step")          if col("Admin Step")          is not None else 4
 
     # Find the student's score column (case-insensitive match on HF username).
     user_col: Optional[int] = None
@@ -206,24 +236,24 @@ async def syllabus_data(request: Request):
             return default
         return row[idx].strip()
 
+    def safe_int(s: str) -> Optional[int]:
+        try:
+            return int(float(s)) if s else None
+        except (ValueError, TypeError):
+            return None
+
     weeks_out = []
     for row in rows[1:]:
         if not any(c.strip() for c in row):
             continue
 
-        def safe_int(s: str) -> Optional[int]:
-            try:
-                return int(float(s)) if s else None
-            except (ValueError, TypeError):
-                return None
-
-        max_pts = safe_int(cell(row, max_i, "0")) or 0
+        max_pts   = safe_int(cell(row, max_i,   "0")) or 0
         admin_step = safe_int(cell(row, admin_i, "0")) or 0
         user_score = safe_int(cell(row, user_col)) if user_col is not None else None
 
         weeks_out.append({
-            "week": cell(row, week_i),
-            "theme": cell(row, theme_i),
+            "week":       cell(row, week_i),
+            "theme":      cell(row, theme_i),
             "objectives": cell(row, obj_i),
             "max_points": max_pts,
             "admin_step": admin_step,
@@ -231,8 +261,8 @@ async def syllabus_data(request: Request):
         })
 
     return JSONResponse({
-        "username": username or "dev",
-        "weeks": weeks_out,
+        "username":      username or "dev",
+        "weeks":         weeks_out,
         "user_col_found": user_col is not None,
     })
 
