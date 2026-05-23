@@ -143,9 +143,9 @@ async def callback(
         "hf_session",
         session_tok,
         httponly=True,
-        samesite="lax",
+        samesite="none",
+        secure=True,
         max_age=86400 * 7,
-        secure=bool(os.environ.get("SPACE_HOST")),
     )
     resp.delete_cookie("oauth_state")
     return resp
