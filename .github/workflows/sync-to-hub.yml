@@ -15,12 +15,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          lfs: true
 
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force \
-            https://twchyin:${HF_TOKEN}@huggingface.co/spaces/twchyin/MARA_map \
-            main:main
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git remote add huggingface \
+            https://twchyin:${HF_TOKEN}@huggingface.co/spaces/twchyin/MARA_map
+          git push huggingface HEAD:main --force --verbose
