@@ -618,7 +618,7 @@ function escHtml(s) {
 // ══════════════════════════════════════════════════════════════════
 async function init() {
   try {
-    const res  = await fetch('/api/syllabus-data');
+    const res  = await fetch('/api/syllabus-data', { credentials: 'same-origin' });
 
     if (res.status === 401) {
       document.getElementById('screen-loading').style.display = 'none';
