@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NTU MARA Quest</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -116,7 +116,12 @@
       margin-bottom: 6px;
       text-shadow: 0 0 10px rgba(255,215,0,.45);
     }
-    .modal-theme { font-size: 9px; color: #87CEEB; letter-spacing: 1px; }
+    .modal-theme {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 11px;
+      color: #87CEEB;
+      letter-spacing: 0.5px;
+    }
 
     /* Body */
     .modal-body { padding: 18px 22px 20px; }
@@ -138,13 +143,16 @@
       display: flex;
       flex-direction: column;
       background: #0f0f2a;
-      border: 2px solid #2a2a50;
+      border: 1px solid #2a2a50;
     }
     .obj-list li {
-      font-size: 8px;
-      color: #dde;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 12px;
+      font-weight: 400;
+      color: #e0e0e0;
       padding: 10px 14px 10px 12px;
-      line-height: 1.9;
+      line-height: 1.6;
+      letter-spacing: 0.6px;
       border-bottom: 1px solid #1a1a3a;
       display: flex;
       align-items: flex-start;
@@ -156,7 +164,7 @@
       color: #FFD700;
       font-size: 10px;
       flex-shrink: 0;
-      margin-top: 2px;
+      margin-top: 3px;
       text-shadow: 0 0 4px rgba(255,215,0,.6);
     }
 
@@ -179,13 +187,28 @@
       line-height: 1;
       text-shadow: 0 0 10px rgba(255,215,0,.65);
     }
-    .score-denom { font-size: 11px; color: #997720; }
+    .score-denom {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      color: #997720;
+      letter-spacing: 0.5px;
+    }
     .star-row    { font-size: 22px; line-height: 1; letter-spacing: 4px; }
     .star-full   { color: #FFD700; text-shadow: 0 0 6px rgba(255,215,0,.8); }
     .star-empty  { color: #2e2800; }
 
-    .no-score-msg { font-size: 9px; color: #666; }
-    .locked-msg   { font-size: 9px; color: #666; }
+    .no-score-msg {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 12px;
+      color: #666;
+      letter-spacing: 0.5px;
+    }
+    .locked-msg {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 12px;
+      color: #666;
+      letter-spacing: 0.5px;
+    }
 
     .nes-progress { width: 100%; height: 14px; margin-top: 4px; }
 
