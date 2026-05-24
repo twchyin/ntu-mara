@@ -339,9 +339,18 @@ const NODES = [
   {id:'Q7',  label:'Q7',  type:'quiz', dataIndex:7,  isBranch:true, branchFrom:6, x:580, y:350},
 ];
 
-// Nodes whose quiz branch is navigable via ↓
-const BRANCH_DOWN = { 3: 12, 6: 13 };  // W4 → Q4, W7 → Q7
-const BRANCH_UP   = {};                  // no upward branches
+// ── Id → index lookup (keeps branch wiring readable by node id) ──
+function nodeIdx(id) {
+  return NODES.findIndex(n => n.id === id);
+}
+
+// Quiz branch map: pressing ↓ on a main-path node enters its quiz branch.
+// Derived from node ids so indices never get out of sync with the array.
+const BRANCH_DOWN = {
+  [nodeIdx('W4')]: nodeIdx('Q4'),  // W4 (idx 3)  → Q4  (idx 12)
+  [nodeIdx('W7')]: nodeIdx('Q7'),  // W7 (idx 6)  → Q7  (idx 13)
+};
+const BRANCH_UP = {};  // no upward branches
 
 // ── Zone helper ───────────────────────────────────────────────────
 function nodeZone(i) {
@@ -770,9 +779,9 @@ function paths() {
     drawMainSegment(i);
     ctx.setLineDash([]);
   }
-  // Side branches
-  drawBranchSegment(3,  12);  // W4 → W4 Quiz (↓)
-  drawBranchSegment(6,  13);  // W7 → W7 Quiz (↓)
+  // Side branches — explicitly wired by node id
+  drawBranchSegment(nodeIdx('W4'), nodeIdx('Q4'));  // W4 main road → Q4 quiz branch (↓)
+  drawBranchSegment(nodeIdx('W7'), nodeIdx('Q7'));  // W7 main road → Q7 quiz branch (↓)
   ctx.setLineDash([]);
   ctx.restore();
 }
@@ -1107,14 +1116,14 @@ document.addEventListener('keydown', e => {
   } else if (e.key === 'ArrowDown') {
     // Enter downward branch (W4/W7 → Quiz), W5 → W4 shortcut, or exit branch back to parent
     if (BRANCH_DOWN[cur] !== undefined) { cur = BRANCH_DOWN[cur]; e.preventDefault(); }
-    else if (cur === 4) { cur = 3; e.preventDefault(); }  // W5 → W4 gateway shortcut
+    else if (cur === nodeIdx('W5')) { cur = nodeIdx('W4'); e.preventDefault(); }  // W5 → W4 shortcut
     else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y > node.y) {
       // Parent is below this branch node → DOWN navigates back toward parent
       cur = node.branchFrom; e.preventDefault();
     }
   } else if (e.key === 'ArrowUp') {
     // W4 → W5 shortcut, exit downward branch back to parent (Quiz → parent)
-    if (cur === 3) { cur = 4; e.preventDefault(); }  // W4 → W5 gateway shortcut
+    if (cur === nodeIdx('W4')) { cur = nodeIdx('W5'); e.preventDefault(); }  // W4 → W5 shortcut
     else if (BRANCH_UP[cur] !== undefined) { cur = BRANCH_UP[cur]; e.preventDefault(); }
     else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y < node.y) {
       // Parent is above this branch node → UP navigates back toward parent
