@@ -656,18 +656,18 @@ function nodes() {
     const zone     = nodeZone(i);
     const isQuiz   = node.type === 'quiz';
 
-    // Pulsing aura
-    if (!locked) {
+    // Pulsing aura — only for unlocked, not-yet-completed nodes
+    if (!locked && !completed) {
       const phase     = Math.abs(Math.sin(frame * 0.038 + i * 0.55));
       const auraR     = NR + 5 + phase * 9;
       const auraAlpha = 0.12 + phase * 0.28;
       let auraColor;
       if (zone === 'cyber') {
-        auraColor = completed ? `rgba(255,0,255,${auraAlpha})` : `rgba(0,255,255,${auraAlpha})`;
+        auraColor = `rgba(0,255,255,${auraAlpha})`;
       } else if (zone === 'desert') {
-        auraColor = completed ? `rgba(255,185,0,${auraAlpha})` : `rgba(245,195,70,${auraAlpha})`;
+        auraColor = `rgba(245,195,70,${auraAlpha})`;
       } else {
-        auraColor = completed ? `rgba(255,200,0,${auraAlpha})` : `rgba(80,210,80,${auraAlpha})`;
+        auraColor = `rgba(80,210,80,${auraAlpha})`;
       }
       ctx.beginPath(); ctx.arc(x, y, auraR, 0, Math.PI * 2);
       ctx.fillStyle = auraColor; ctx.fill();
@@ -692,36 +692,34 @@ function nodes() {
       else if (zone === 'cyber') { sg.addColorStop(0,'#1a2045'); sg.addColorStop(1,'#0c1030'); }
       else { sg.addColorStop(0,'#3a4a30'); sg.addColorStop(1,'#1a2810'); }
       ctx.fillStyle = sg;
+    } else if (completed) {
+      // Flat retro "level clear" blue — no radial gradient, no glow
+      ctx.fillStyle = '#4a75a0';
     } else if (isQuiz) {
-      // Quiz branch: gold-orange special fill
       const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (completed) { g.addColorStop(0,'#FFD060'); g.addColorStop(0.6,'#c06000'); g.addColorStop(1,'#4a1800'); }
-      else           { g.addColorStop(0,'#FFF0A0'); g.addColorStop(0.6,'#d49020'); g.addColorStop(1,'#5a3000'); }
+      g.addColorStop(0,'#FFF0A0'); g.addColorStop(0.6,'#d49020'); g.addColorStop(1,'#5a3000');
       ctx.fillStyle = g;
     } else if (zone === 'cyber') {
       const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (completed) { g.addColorStop(0,'#FF88FF'); g.addColorStop(0.6,'#CC00CC'); g.addColorStop(1,'#330033'); }
-      else           { g.addColorStop(0,'#88FFFF'); g.addColorStop(0.6,'#008888'); g.addColorStop(1,'#002222'); }
+      g.addColorStop(0,'#88FFFF'); g.addColorStop(0.6,'#008888'); g.addColorStop(1,'#002222');
       ctx.fillStyle = g;
     } else if (zone === 'desert') {
       const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (completed) { g.addColorStop(0,'#FFD060'); g.addColorStop(1,'#7a4400'); }
-      else           { g.addColorStop(0,'#e8c060'); g.addColorStop(1,'#8a5c18'); }
+      g.addColorStop(0,'#e8c060'); g.addColorStop(1,'#8a5c18');
       ctx.fillStyle = g;
     } else {
       const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (completed) { g.addColorStop(0,'#FFE082'); g.addColorStop(1,'#D84900'); }
-      else           { g.addColorStop(0,'#82E082'); g.addColorStop(1,'#165016'); }
+      g.addColorStop(0,'#82E082'); g.addColorStop(1,'#165016');
       ctx.fillStyle = g;
     }
     ctx.fill();
 
-    // Cyber scan-line
-    if (zone === 'cyber' && !locked) {
+    // Cyber scan-line — only on unlocked, incomplete cyber nodes
+    if (zone === 'cyber' && !locked && !completed) {
       ctx.save();
       ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.clip();
       ctx.globalAlpha = 0.28;
-      ctx.fillStyle   = completed ? '#FF00FF' : '#00FFFF';
+      ctx.fillStyle   = '#00FFFF';
       const scanY = y - NR + ((frame * 2.2) % (NR * 2));
       ctx.fillRect(x - NR, scanY - 1, NR * 2, 1.5);
       ctx.fillRect(x - NR, scanY - NR - 1, NR * 2, 1.5);
@@ -732,24 +730,28 @@ function nodes() {
     let borderColor;
     if (locked) {
       borderColor = zone === 'cyber' ? '#223' : '#444';
+    } else if (completed) {
+      borderColor = '#000';  // sharp black border on cleared nodes — no glow
     } else if (isQuiz) {
-      borderColor = completed ? '#FFD700' : '#d4a020';
+      borderColor = '#d4a020';
     } else if (zone === 'cyber') {
-      borderColor = completed ? '#FF00FF' : '#00FFFF';
+      borderColor = '#00FFFF';
     } else if (zone === 'desert') {
-      borderColor = completed ? '#FFD700' : '#c09020';
+      borderColor = '#c09020';
     } else {
-      borderColor = completed ? '#FFD700' : '#0e3a0e';
+      borderColor = '#0e3a0e';
     }
 
-    if ((zone === 'cyber' || isQuiz) && !locked) {
+    if ((zone === 'cyber' || isQuiz) && !locked && !completed) {
+      // Glow border only on active (incomplete) cyber/quiz nodes
       ctx.save();
       ctx.shadowColor = borderColor; ctx.shadowBlur = 14;
       ctx.strokeStyle = borderColor; ctx.lineWidth  = 3;
       ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else {
-      ctx.strokeStyle = borderColor; ctx.lineWidth = 3; ctx.stroke();
+      ctx.shadowBlur  = 0;
+      ctx.strokeStyle = borderColor; ctx.lineWidth = 2; ctx.stroke();
     }
 
     // Quiz outer ring (double-border to distinguish from main nodes)
@@ -770,7 +772,8 @@ function nodes() {
       ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(nodeLabel, x, y + NR + 10);
     } else {
-      ctx.fillStyle    = isQuiz ? '#FFD700' : (zone === 'cyber' ? '#00FFFF' : '#fff');
+      // Label text — cleared nodes use white so it reads against the flat blue fill
+      ctx.fillStyle    = completed ? '#fff' : (isQuiz ? '#FFD700' : (zone === 'cyber' ? '#00FFFF' : '#fff'));
       ctx.font         = `bold ${nodeLabel.length > 2 ? 8 : 9}px "Press Start 2P"`;
       ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(nodeLabel, x, y);
@@ -782,6 +785,23 @@ function nodes() {
         ctx.font      = '9px sans-serif';
         ctx.fillStyle = completed ? '#FFD700' : (zone === 'cyber' ? '#00CCCC' : '#8a8');
         ctx.fillText(s, x, y + NR + 11);
+      }
+
+      // Pixel checkmark badge on completed nodes (top-right corner of circle)
+      if (completed) {
+        const bx = x + Math.round(NR * 0.68);
+        const by = y - Math.round(NR * 0.68);
+        // Badge backing
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(bx - 4, by - 4, 9, 9);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(bx - 3, by - 3, 7, 7);
+        // Crisp 5×4 checkmark pixels
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(bx - 2, by + 1, 2, 2);  // left down-tick
+        ctx.fillRect(bx,     by + 3, 2, 2);  // bottom of tick
+        ctx.fillRect(bx + 2, by + 1, 2, 2);  // right upstroke low
+        ctx.fillRect(bx + 4, by - 1, 2, 2);  // right upstroke high
       }
     }
   });
