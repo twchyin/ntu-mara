@@ -342,9 +342,9 @@ const NODES = [
   {id:'W10', label:'W10', type:'week', dataIndex:10, x:240, y:120},
   {id:'W11', label:'W11', type:'week', dataIndex:11, x:550, y:120},
   {id:'W12', label:'W12', type:'week', dataIndex:12, x:880, y:120},
-  // Quiz side-branches — keep isBranch/branchFrom for navigation compatibility
-  {id:'Q4',  label:'Q4',  type:'quiz', dataIndex:4,  isBranch:true, branchFrom:3, x:640, y:550},
-  {id:'Q7',  label:'Q7',  type:'quiz', dataIndex:7,  isBranch:true, branchFrom:6, x:580, y:350},
+  // Quiz side-branches — points = course-weight contribution toward the 100-pt total
+  {id:'Q4',  label:'Q4',  type:'quiz', dataIndex:4,  isBranch:true, branchFrom:3, x:640, y:550, points:8},
+  {id:'Q7',  label:'Q7',  type:'quiz', dataIndex:7,  isBranch:true, branchFrom:6, x:580, y:350, points:9},
 ];
 
 // ── Id → index lookup (keeps branch wiring readable by node id) ──
@@ -1078,14 +1078,25 @@ async function init() {
     weeks = data.weeks || [];
 
     document.getElementById('hud-user').textContent = `👤 ${username.toUpperCase()}`;
-    // Score totals: sum only main-path week nodes (indices 0–MAIN_PATH_LEN-1)
+    // Score totals: all nodes including quiz branches.
+    // Quiz nodes carry a fixed course-weight (node.points); earned score is
+    // scaled proportionally from the raw sheet score (e.g. 80/100 quiz → 6.4/8 pts).
+    // Week nodes use sheet max_points and user_score directly.
     let tot = 0, max = 0;
-    for (let i = 0; i < MAIN_PATH_LEN; i++) {
+    NODES.forEach((node, i) => {
       const w = weekData(i);
-      tot += (w.user_score  || 0);
-      max += (w.max_points  || 0);
-    }
-    document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
+      if (node.points !== undefined) {
+        max += node.points;
+        if (w.max_points > 0 && w.user_score != null) {
+          tot += Math.round((w.user_score / w.max_points) * node.points * 10) / 10;
+        }
+      } else {
+        max += (w.max_points || 0);
+        tot += (w.user_score || 0);
+      }
+    });
+    const totDisplay = Number.isInteger(tot) ? tot : tot.toFixed(1);
+    document.getElementById('hud-score').textContent = `${totDisplay} / ${max} PTS`;
 
     if (!data.user_col_found && username !== 'dev') {
       document.getElementById('hud-score').textContent += '  ⚠ name not in sheet';
