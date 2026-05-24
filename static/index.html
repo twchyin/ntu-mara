@@ -1153,7 +1153,7 @@ function openModal(idx) {
   // ── Header ────────────────────────────────────────────────────────
   document.getElementById('m-week').textContent = isQuiz
     ? `🏆 WEEK ${node.dataIndex} EVALUATION QUIZ`
-    : (w.week || `Week ${node.dataIndex}`);
+    : `WEEK ${node.dataIndex} — LESSON OBJECTIVES`;
 
   document.getElementById('m-theme').textContent = isQuiz
     ? (w.theme || 'HANDS-ON ASSESSMENT')
