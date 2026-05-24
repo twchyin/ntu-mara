@@ -49,7 +49,7 @@
       display: block;
       width: 100%;
       /* Background overworld art — canvas is transparent on top of this */
-      background-image: url('https://drive.google.com/uc?export=view&id=1Xnkzva6tfUfuEKT9v2SDLMd8Z6PyH8sj');
+      background-image: url('assets/overworld_map.png');
       background-size: 100% 100%;
       background-repeat: no-repeat;
       background-position: center;
@@ -504,68 +504,7 @@ ctx.imageSmoothingEnabled        = false;
 ctx.mozImageSmoothingEnabled     = false;
 ctx.webkitImageSmoothingEnabled  = false;
 
-// ══════════════════════════════════════════════════════════════════
-//  Background — three layered biome gradients
-// ══════════════════════════════════════════════════════════════════
-function drawBackground() {
-  const jg = ctx.createLinearGradient(0, 0, 0, CH);
-  jg.addColorStop(0,   '#1a330e');
-  jg.addColorStop(0.5, '#234a14');
-  jg.addColorStop(1,   '#2e5a1c');
-  ctx.fillStyle = jg;
-  ctx.fillRect(0, 0, CW, CH);
 
-  const dg = ctx.createLinearGradient(0, 370, 0, CH);
-  dg.addColorStop(0,    'rgba(200,148,65,0)');
-  dg.addColorStop(0.22, 'rgba(218,175,110,0.82)');
-  dg.addColorStop(1,    'rgba(238,217,144,1)');
-  ctx.fillStyle = dg;
-  ctx.fillRect(0, 370, CW, CH - 370);
-
-  const cg = ctx.createLinearGradient(0, 0, 0, 220);
-  cg.addColorStop(0,    'rgba(10,13,30,1)');
-  cg.addColorStop(0.65, 'rgba(20,26,55,0.88)');
-  cg.addColorStop(1,    'rgba(20,26,55,0)');
-  ctx.fillStyle = cg;
-  ctx.fillRect(0, 0, CW, 220);
-}
-
-// ── Isometric cyber grid ──────────────────────────────────────────
-function drawCyberGrid() {
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, CW, 210);
-  ctx.clip();
-  ctx.globalAlpha = 0.14;
-  ctx.strokeStyle = '#00FFFF';
-  ctx.lineWidth   = 0.6;
-  for (let y = 0; y <= 210; y += 22) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CW, y); ctx.stroke();
-  }
-  for (let x = -CW; x < CW * 2; x += 32) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 110, 210); ctx.stroke();
-  }
-  ctx.restore();
-}
-
-// ── Sand dunes ────────────────────────────────────────────────────
-function drawSandDunes() {
-  ctx.save();
-  [
-    [88,  510, 125, 0.30],
-    [310, 530, 100, 0.25],
-    [568, 508, 115, 0.28],
-    [725, 528,  85, 0.22],
-    [900, 520,  95, 0.24],
-  ].forEach(([cx, cy, rx, a]) => {
-    ctx.globalAlpha = a;
-    ctx.fillStyle   = 'rgba(190,138,52,0.30)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, rx, rx * 0.28, 0, 0, Math.PI * 2);
-    ctx.fill();
-  });
-  ctx.restore();
-}
 
 // ── Oasis near W2 ────────────────────────────────────────────────
 function drawOasis() {
