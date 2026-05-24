@@ -1078,13 +1078,14 @@ async function init() {
     weeks = data.weeks || [];
 
     document.getElementById('hud-user').textContent = `👤 ${username.toUpperCase()}`;
-    // Score totals: sum only main-path week nodes (indices 0–MAIN_PATH_LEN-1)
+    // Score totals: all 14 nodes (12 weeks + Q4 + Q7).
+    // max_points for every node comes from the sheet; they sum to 100.
     let tot = 0, max = 0;
-    for (let i = 0; i < MAIN_PATH_LEN; i++) {
+    NODES.forEach((node, i) => {
       const w = weekData(i);
       tot += (w.user_score  || 0);
       max += (w.max_points  || 0);
-    }
+    });
     document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
 
     if (!data.user_col_found && username !== 'dev') {
