@@ -48,6 +48,14 @@
     #c {
       display: block;
       width: 100%;
+      /* Background overworld art — canvas is transparent on top of this */
+      background-image: url('https://drive.google.com/uc?export=view&id=1Xnkzva6tfUfuEKT9v2SDLMd8Z6PyH8sj');
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      background-position: center;
+      /* Pixel-perfect rendering — no browser blur */
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-crisp-edges;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       border-left: 4px solid #FFD700;
@@ -490,6 +498,11 @@ let username = '';
 
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
+
+// Disable all browser blur — keep every pixel sharp
+ctx.imageSmoothingEnabled        = false;
+ctx.mozImageSmoothingEnabled     = false;
+ctx.webkitImageSmoothingEnabled  = false;
 
 // ══════════════════════════════════════════════════════════════════
 //  Background — three layered biome gradients
@@ -1059,34 +1072,12 @@ function drawDataPackets() {
 // ══════════════════════════════════════════════════════════════════
 function tick() {
   frame++;
-  CLOUDS.forEach((c, i) => {
-    c.x += c.s;
-    c.y  = c.baseY + Math.sin(frame * 0.018 + i * 1.35) * 4;
-    if (c.x - c.w > CW) c.x = -c.w;
-  });
-  updateScorpions();
-  updateSnakes();
-  updateDataPackets();
 
+  // Background image is rendered by CSS — clear canvas to transparent
+  // so the image shows through, then draw only the interactive layer.
   ctx.clearRect(0, 0, CW, CH);
 
-  drawBackground();
-  drawCyberGrid();
-
-  drawSandDunes();
-  drawOasis();
-  CACTI.forEach(c => drawCactus(c.x, c.y, c.h));
-  JUNGLE_TREES.forEach(t => jungleTree(t.x, t.y));
-  SERVER_TOWERS.forEach(t => drawServerTower(t.x, t.y));
-
-  CLOUDS.forEach(cloud);
-
   paths();
-
-  SCORPIONS.forEach(s => drawScorpion(s.x, s.y, s.dir));
-  SNAKES.forEach(s => drawSnake(s.x, s.y, s.phase));
-  drawDataPackets();
-
   nodes();
   player();
 
