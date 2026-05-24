@@ -664,23 +664,6 @@ function nodes() {
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    // Pulsing aura — only for unlocked, not-yet-completed nodes
-    if (!locked && !completed) {
-      const phase     = Math.abs(Math.sin(frame * 0.038 + i * 0.55));
-      const auraR     = NR + 5 + phase * 9;
-      const auraAlpha = 0.12 + phase * 0.28;
-      let auraColor;
-      if (zone === 'cyber') {
-        auraColor = `rgba(0,255,255,${auraAlpha})`;
-      } else if (zone === 'desert') {
-        auraColor = `rgba(245,195,70,${auraAlpha})`;
-      } else {
-        auraColor = `rgba(80,210,80,${auraAlpha})`;
-      }
-      ctx.beginPath(); ctx.arc(x, y, auraR, 0, Math.PI * 2);
-      ctx.fillStyle = auraColor; ctx.fill();
-    }
-
     // Selection ring
     if (isCur) {
       ctx.save();
@@ -750,16 +733,10 @@ function nodes() {
       borderColor = '#0e3a0e';
     }
 
-    if ((zone === 'cyber' || isQuiz) && !locked && !completed) {
-      // Glow border only on active (incomplete) cyber/quiz nodes
-      ctx.save();
-      ctx.shadowColor = borderColor; ctx.shadowBlur = 14;
-      ctx.strokeStyle = borderColor; ctx.lineWidth  = 3;
-      ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
-    } else {
-      ctx.strokeStyle = borderColor; ctx.lineWidth = 2; ctx.stroke();
-    }
+    // Universal crisp 16-bit border — no shadow blur on any node
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth   = 2;
+    ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.stroke();
 
     // Quiz outer ring (double-border to distinguish from main nodes)
     if (isQuiz && !locked) {
