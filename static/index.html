@@ -290,7 +290,7 @@ const NODES = [
   {x:460,  y:300},                               // 5  W6   jungle
   {x:340,  y:260},                               // 6  W7   jungle (branch origin ↑)
   {x:220,  y:220},                               // 7  W8   jungle
-  {x:360,  y:140},                               // 8  W9   jungle endpoint
+  {x:410,  y:130},                               // 8  W9   jungle endpoint
   {x:520,  y:120},                               // 9  W10  cyber entry
   {x:700,  y:100},                               // 10 W11  cyber
   {x:880,  y: 90},                               // 11 W12  cyber peak
@@ -1042,15 +1042,17 @@ document.addEventListener('keydown', e => {
     else if (cur > 0)  { cur--; }
     e.preventDefault();
   } else if (e.key === 'ArrowDown') {
-    // Enter downward branch (W4 → W4 Quiz), or exit upward branch (W7 Quiz → W7)
+    // Enter downward branch (W4 → W4 Quiz), or exit an upward branch back to parent (Q7 → W7)
     if (BRANCH_DOWN[cur] !== undefined)  { cur = BRANCH_DOWN[cur]; e.preventDefault(); }
-    else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y < node.y) {
+    else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y > node.y) {
+      // Parent is below this branch node → DOWN navigates back toward parent
       cur = node.branchFrom; e.preventDefault();
     }
   } else if (e.key === 'ArrowUp') {
-    // Enter upward branch (W7 → W7 Quiz), or exit downward branch (W4 Quiz → W4)
+    // Enter upward branch (W7 → W7 Quiz), or exit a downward branch back to parent (W4 Quiz → W4)
     if (BRANCH_UP[cur] !== undefined)    { cur = BRANCH_UP[cur];   e.preventDefault(); }
-    else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y > node.y) {
+    else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y < node.y) {
+      // Parent is above this branch node → UP navigates back toward parent
       cur = node.branchFrom; e.preventDefault();
     }
   } else if (e.key === 'Enter' || e.key === ' ') {
