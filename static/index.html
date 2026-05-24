@@ -209,6 +209,51 @@
       letter-spacing: 0.5px;
     }
 
+    /* Quiz mode — orange/amber accent replaces gold */
+    #modal-box.quiz-mode {
+      border-color: #FF6B35;
+      box-shadow: 6px 6px 0 #8a2e00, 12px 12px 0 #3a1200;
+    }
+    #modal-box.quiz-mode .modal-header {
+      background: linear-gradient(135deg, #1a0800 0%, #2e1000 60%, #1a0800 100%);
+      border-bottom-color: #FF6B35;
+    }
+    #modal-box.quiz-mode .modal-week  { color: #FF8C55; text-shadow: 0 0 10px rgba(255,107,53,.45); }
+    #modal-box.quiz-mode .modal-theme { color: #FFB899; }
+    #modal-box.quiz-mode .section-label { color: #FF8C55; }
+    #modal-box.quiz-mode .modal-footer { border-top-color: #3a1800; }
+
+    /* Quiz info list — amber accent instead of gold stars */
+    .quiz-info-list {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      background: #0f0a00;
+      border: 1px solid #3a1800;
+    }
+    .quiz-info-list li {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 12px;
+      color: #e8d0b0;
+      padding: 10px 14px 10px 12px;
+      line-height: 1.6;
+      letter-spacing: 0.6px;
+      border-bottom: 1px solid #2a1000;
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+    }
+    .quiz-info-list li:last-child { border-bottom: none; }
+    .quiz-info-list li::before {
+      content: "◆";
+      color: #FF8C55;
+      font-size: 9px;
+      flex-shrink: 0;
+      margin-top: 4px;
+      text-shadow: 0 0 4px rgba(255,107,53,.6);
+    }
+
     .nes-progress { width: 100%; height: 14px; margin-top: 4px; }
 
     /* Footer — centered close button */
@@ -260,12 +305,7 @@
       <div class="modal-week" id="m-week"></div>
       <div class="modal-theme" id="m-theme"></div>
     </div>
-    <div class="modal-body">
-      <div class="section-label">📚 LEARNING OBJECTIVES</div>
-      <ul class="obj-list" id="m-objectives"></ul>
-      <div class="section-label" style="margin-top:16px">🏆 YOUR SCORE</div>
-      <div class="score-box" id="m-score"></div>
-    </div>
+    <div class="modal-body" id="m-body"></div>
     <div class="modal-footer">
       <button class="nes-btn is-error" onclick="closeModal()">✕ CLOSE</button>
     </div>
@@ -1101,53 +1141,45 @@ canvas.addEventListener('click', e => {
 //  Modal
 // ══════════════════════════════════════════════════════════════════
 function openModal(idx) {
-  const node  = NODES[idx];
-  const isQuiz= node && node.type === 'quiz';
-  const w     = weekData(idx);
+  const node   = NODES[idx];
+  const isQuiz = node && node.type === 'quiz';
+  const w      = weekData(idx);
   if (!w) return;
 
-  // Quiz nodes show "QUIZ — Week N", main nodes show their own week label
-  const weekLabel = isQuiz
-    ? `${w.week || `Week ${node.dataIndex}`} — QUIZ`
+  const locked = w.admin_step === 0;
+  const mp     = w.max_points;
+  const sc     = w.user_score;
+
+  // ── Header ────────────────────────────────────────────────────────
+  document.getElementById('m-week').textContent = isQuiz
+    ? `🏆 WEEK ${node.dataIndex} EVALUATION QUIZ`
     : (w.week || `Week ${node.dataIndex}`);
 
-  document.getElementById('m-week').textContent  = weekLabel;
-  document.getElementById('m-theme').textContent = w.theme || '';
+  document.getElementById('m-theme').textContent = isQuiz
+    ? (w.theme || 'HANDS-ON ASSESSMENT')
+    : (w.theme || '');
 
-  const rawObjs = (w.objectives || '').replace(/\r/g, '');
-  const lines   = rawObjs
-    .split('\n')
-    .map(l => l.replace(/^[\s•\-\*\d\.]+/, '').trim())
-    .filter(l => l.length > 0);
+  // Toggle quiz visual accent on the modal frame
+  document.getElementById('modal-box').classList.toggle('quiz-mode', isQuiz);
 
-  const objEl = document.getElementById('m-objectives');
-  objEl.innerHTML = lines.length
-    ? lines.map(l => `<li>${escHtml(l)}</li>`).join('')
-    : '<li style="color:#444;font-style:italic">No objectives listed</li>';
-
-  const scoreEl = document.getElementById('m-score');
-  const locked  = w.admin_step === 0;
-  const mp      = w.max_points;
-  const sc      = w.user_score;
-
-  if (locked) {
-    scoreEl.innerHTML = `<p class="locked-msg">🔒 NOT YET UNLOCKED</p>`;
-  } else if (!mp) {
-    scoreEl.innerHTML = `<p class="no-score-msg">No assessment this week</p>`;
-  } else if (mp <= 5) {
-    let stars = '';
-    for (let k = 0; k < mp; k++)
-      stars += `<span class="${k < (sc||0) ? 'star-full' : 'star-empty'}">★</span>`;
-    const got = sc != null ? sc : '?';
-    scoreEl.innerHTML = `
-      <div class="score-label">YOUR SCORE</div>
-      <div class="star-row">${stars}</div>
-      <div style="font-size:8px;color:#997720">${got} / ${mp} pts</div>`;
-  } else {
+  // ── Shared score panel HTML ───────────────────────────────────────
+  function buildScoreHtml() {
+    if (locked) return `<p class="locked-msg">🔒 NOT YET UNLOCKED</p>`;
+    if (!mp)    return `<p class="no-score-msg">No assessment recorded</p>`;
+    if (mp <= 5) {
+      let stars = '';
+      for (let k = 0; k < mp; k++)
+        stars += `<span class="${k < (sc||0) ? 'star-full' : 'star-empty'}">★</span>`;
+      const got = sc != null ? sc : '?';
+      return `
+        <div class="score-label">YOUR SCORE</div>
+        <div class="star-row">${stars}</div>
+        <div style="font-size:8px;color:#997720">${got} / ${mp} pts</div>`;
+    }
     const got      = sc != null ? sc : null;
     const pct      = (got != null && mp) ? Math.round(got / mp * 100) : 0;
     const barClass = pct >= 80 ? 'is-success' : pct >= 50 ? 'is-warning' : 'is-error';
-    scoreEl.innerHTML = `
+    return `
       <div class="score-label">YOUR SCORE</div>
       <div>
         <span class="score-value">${got != null ? got : '—'}</span>
@@ -1157,6 +1189,45 @@ function openModal(idx) {
         ? `<progress class="nes-progress ${barClass}" value="${got}" max="${mp}"></progress>
            <div style="font-size:8px;color:#997720">${pct}%</div>`
         : '<div style="font-size:8px;color:#555">Score not recorded</div>'}`;
+  }
+
+  // ── Parse objectives / instructions text ──────────────────────────
+  function parseLines() {
+    return (w.objectives || '').replace(/\r/g, '')
+      .split('\n')
+      .map(l => l.replace(/^[\s•\-\*\d\.]+/, '').trim())
+      .filter(l => l.length > 0);
+  }
+
+  // ── Body HTML — branched by node.type ────────────────────────────
+  const bodyEl = document.getElementById('m-body');
+
+  if (isQuiz) {
+    const lines = parseLines();
+    const instructionHtml = lines.length
+      ? lines.map(l => `<li>${escHtml(l)}</li>`).join('')
+      : [
+          `<li>Complete the hands-on database assessment on your local development environment</li>`,
+          `<li>Total Points Possible: ${mp || '—'}</li>`,
+          `<li>Submit your work via the course portal before the deadline</li>`,
+        ].join('');
+
+    bodyEl.innerHTML = `
+      <div class="section-label">📋 ASSESSMENT OVERVIEW</div>
+      <ul class="quiz-info-list">${instructionHtml}</ul>
+      <div class="section-label" style="margin-top:16px">🏆 SUBMISSION STATUS</div>
+      <div class="score-box">${buildScoreHtml()}</div>`;
+  } else {
+    const lines   = parseLines();
+    const objHtml = lines.length
+      ? lines.map(l => `<li>${escHtml(l)}</li>`).join('')
+      : '<li style="color:#444;font-style:italic">No objectives listed</li>';
+
+    bodyEl.innerHTML = `
+      <div class="section-label">📚 LEARNING OBJECTIVES</div>
+      <ul class="obj-list">${objHtml}</ul>
+      <div class="section-label" style="margin-top:16px">🏆 YOUR SCORE</div>
+      <div class="score-box">${buildScoreHtml()}</div>`;
   }
 
   document.getElementById('modal-wrap').classList.add('open');
