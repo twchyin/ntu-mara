@@ -656,6 +656,14 @@ function nodes() {
     const zone     = nodeZone(i);
     const isQuiz   = node.type === 'quiz';
 
+    // Hard-reset all shadow state before drawing every node so nothing
+    // bleeds in from paths(), cyber pulse, or the previous node's glow border.
+    ctx.save();
+    ctx.shadowBlur    = 0;
+    ctx.shadowColor   = 'transparent';
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
     // Pulsing aura — only for unlocked, not-yet-completed nodes
     if (!locked && !completed) {
       const phase     = Math.abs(Math.sin(frame * 0.038 + i * 0.55));
@@ -750,7 +758,6 @@ function nodes() {
       ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else {
-      ctx.shadowBlur  = 0;
       ctx.strokeStyle = borderColor; ctx.lineWidth = 2; ctx.stroke();
     }
 
@@ -791,19 +798,19 @@ function nodes() {
       if (completed) {
         const bx = x + Math.round(NR * 0.68);
         const by = y - Math.round(NR * 0.68);
-        // Badge backing
         ctx.fillStyle = '#FFD700';
         ctx.fillRect(bx - 4, by - 4, 9, 9);
         ctx.fillStyle = '#000';
         ctx.fillRect(bx - 3, by - 3, 7, 7);
-        // Crisp 5×4 checkmark pixels
         ctx.fillStyle = '#FFD700';
-        ctx.fillRect(bx - 2, by + 1, 2, 2);  // left down-tick
-        ctx.fillRect(bx,     by + 3, 2, 2);  // bottom of tick
-        ctx.fillRect(bx + 2, by + 1, 2, 2);  // right upstroke low
-        ctx.fillRect(bx + 4, by - 1, 2, 2);  // right upstroke high
+        ctx.fillRect(bx - 2, by + 1, 2, 2);
+        ctx.fillRect(bx,     by + 3, 2, 2);
+        ctx.fillRect(bx + 2, by + 1, 2, 2);
+        ctx.fillRect(bx + 4, by - 1, 2, 2);
       }
     }
+
+    ctx.restore();  // ← paired with the save() at the top of this node's draw pass
   });
 }
 
