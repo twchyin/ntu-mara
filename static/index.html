@@ -282,38 +282,61 @@ const MAIN_PATH_LEN = 12;   // indices 0–11 on the main trail
 
 // ── Node layout — 12 main path + 2 quiz side-branches ────────────
 const NODES = [
-  {x:100,  y:480},                               // 0  W1   desert start
-  {x:280,  y:480},                               // 1  W2   desert
-  {x:460,  y:480},                               // 2  W3   desert
-  {x:640,  y:480},                               // 3  W4   desert (branch origin ↓)
-  {x:740,  y:380},                               // 4  W5   jungle entry
-  {x:740,  y:280},                               // 5  W6   jungle
-  {x:580,  y:280},                               // 6  W7   jungle (branch origin ↓)
-  {x:420,  y:280},                               // 7  W8   jungle
-  {x:240,  y:280},                               // 8  W9   jungle
-  {x:240,  y:120},                               // 9  W10  cyber entry
-  {x:550,  y:120},                               // 10 W11  cyber
-  {x:880,  y:120},                               // 11 W12  cyber peak
-  {x:640,  y:550, isBranch:true, branchFrom:3},  // 12 W4 Quiz (↓ from W4)
-  {x:580,  y:350, isBranch:true, branchFrom:6},  // 13 W7 Quiz (↓ from W7)
+  {id:'W1',  label:'W1',  type:'week', dataIndex:1,  x:100, y:480},
+  {id:'W2',  label:'W2',  type:'week', dataIndex:2,  x:280, y:480},
+  {id:'W3',  label:'W3',  type:'week', dataIndex:3,  x:460, y:480},
+  {id:'W4',  label:'W4',  type:'week', dataIndex:4,  x:640, y:480},
+  {id:'W5',  label:'W5',  type:'week', dataIndex:5,  x:740, y:380},
+  {id:'W6',  label:'W6',  type:'week', dataIndex:6,  x:740, y:280},
+  {id:'W7',  label:'W7',  type:'week', dataIndex:7,  x:580, y:280},
+  {id:'W8',  label:'W8',  type:'week', dataIndex:8,  x:420, y:280},
+  {id:'W9',  label:'W9',  type:'week', dataIndex:9,  x:240, y:280},
+  {id:'W10', label:'W10', type:'week', dataIndex:10, x:240, y:120},
+  {id:'W11', label:'W11', type:'week', dataIndex:11, x:550, y:120},
+  {id:'W12', label:'W12', type:'week', dataIndex:12, x:880, y:120},
+  // Quiz side-branches — keep isBranch/branchFrom for navigation compatibility
+  {id:'Q4',  label:'Q4',  type:'quiz', dataIndex:4,  isBranch:true, branchFrom:3, x:640, y:550},
+  {id:'Q7',  label:'Q7',  type:'quiz', dataIndex:7,  isBranch:true, branchFrom:6, x:580, y:350},
 ];
 
 // Nodes whose quiz branch is navigable via ↓
-const BRANCH_DOWN = { 3: 12, 6: 13 };  // W4 → W4 Quiz, W7 → W7 Quiz
+const BRANCH_DOWN = { 3: 12, 6: 13 };  // W4 → Q4, W7 → Q7
 const BRANCH_UP   = {};                  // no upward branches
 
 // ── Zone helper ───────────────────────────────────────────────────
 function nodeZone(i) {
   const n = NODES[i];
-  if (n && n.isBranch) return nodeZone(n.branchFrom);
+  if (n && n.type === 'quiz') return nodeZone(n.branchFrom);
   return i <= 3 ? 'desert' : i <= 8 ? 'jungle' : 'cyber';
 }
 
-// Use parent week data for branch nodes; branch nodes borrow branchFrom week
+// Look up week data by explicit dataIndex + type to avoid off-by-one errors
+// when the Google Sheet includes interspersed quiz rows.
 function weekData(i) {
-  const n   = NODES[i];
-  const idx = (n && n.isBranch) ? n.branchFrom : i;
-  return weeks[idx] || {admin_step:0, max_points:0, user_score:null, week:'', theme:'', objectives:''};
+  const node = NODES[i];
+  if (!node) return {admin_step:0, max_points:0, user_score:null, week:'', theme:'', objectives:''};
+  const di      = node.dataIndex;  // 1-based week number
+  const isQuiz  = node.type === 'quiz';
+  const target  = `week ${di}`;
+
+  // Primary: label-based search (robust against interspersed quiz rows in sheets)
+  if (isQuiz) {
+    // Quiz nodes prefer a quiz-labelled row for this week number
+    const quizRow = weeks.find(w => {
+      const lbl = (w.week || '').trim().toLowerCase();
+      return lbl.startsWith(target) && /quiz/i.test(lbl);
+    });
+    if (quizRow) return quizRow;
+  }
+  // Regular week (or quiz fallback): find the non-quiz entry for this week number
+  const weekRow = weeks.find(w => {
+    const lbl = (w.week || '').trim().toLowerCase();
+    return lbl === target || (lbl.startsWith(target + ' ') && !/quiz/i.test(lbl));
+  });
+  if (weekRow) return weekRow;
+
+  // Final fallback: 0-based positional lookup
+  return weeks[di - 1] || {admin_step:0, max_points:0, user_score:null, week:'', theme:'', objectives:''};
 }
 
 function isUnlocked(i) {
@@ -735,7 +758,7 @@ function nodes() {
     const completed= w.user_score != null && w.user_score > 0;
     const isCur    = i === cur;
     const zone     = nodeZone(i);
-    const isQuiz   = !!node.isBranch;
+    const isQuiz   = node.type === 'quiz';
 
     // Pulsing aura
     if (!locked) {
@@ -841,10 +864,8 @@ function nodes() {
       ctx.setLineDash([]);
     }
 
-    // Label / padlock
-    const nodeLabel = isQuiz
-      ? `Q${node.branchFrom + 1}`
-      : `W${i + 1}`;
+    // Label / padlock — use explicit label from node definition
+    const nodeLabel = node.label;
 
     if (locked) {
       drawPadlock(x, y);
@@ -1081,14 +1102,14 @@ canvas.addEventListener('click', e => {
 // ══════════════════════════════════════════════════════════════════
 function openModal(idx) {
   const node  = NODES[idx];
-  const isQuiz= node && node.isBranch;
+  const isQuiz= node && node.type === 'quiz';
   const w     = weekData(idx);
   if (!w) return;
 
-  // Branch nodes show "QUIZ — Week N", main nodes show their own week label
+  // Quiz nodes show "QUIZ — Week N", main nodes show their own week label
   const weekLabel = isQuiz
-    ? `${w.week || `Week ${node.branchFrom + 1}`} — QUIZ`
-    : (w.week || `Week ${idx + 1}`);
+    ? `${w.week || `Week ${node.dataIndex}`} — QUIZ`
+    : (w.week || `Week ${node.dataIndex}`);
 
   document.getElementById('m-week').textContent  = weekLabel;
   document.getElementById('m-theme').textContent = w.theme || '';
@@ -1174,20 +1195,17 @@ async function init() {
 
     const data = await res.json();
     username   = data.username || 'Guest';
-    // Clamp to main path length; branch nodes borrow from parent via weekData()
-    weeks      = (data.weeks || []).slice(0, MAIN_PATH_LEN);
-
-    while (weeks.length < MAIN_PATH_LEN) {
-      weeks.push({
-        week: `Week ${weeks.length + 1}`, theme: '',
-        objectives: '', max_points: 0, admin_step: 0, user_score: null,
-      });
-    }
+    // Keep ALL rows (including any interspersed quiz rows) so weekData() label-search works correctly
+    weeks = data.weeks || [];
 
     document.getElementById('hud-user').textContent = `👤 ${username.toUpperCase()}`;
-    // Score totals count only main-path weeks
-    const tot = weeks.reduce((s, w) => s + (w.user_score || 0), 0);
-    const max = weeks.reduce((s, w) => s + (w.max_points || 0), 0);
+    // Score totals: sum only main-path week nodes (indices 0–MAIN_PATH_LEN-1)
+    let tot = 0, max = 0;
+    for (let i = 0; i < MAIN_PATH_LEN; i++) {
+      const w = weekData(i);
+      tot += (w.user_score  || 0);
+      max += (w.max_points  || 0);
+    }
     document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
 
     if (!data.user_col_found && username !== 'dev') {
