@@ -25,7 +25,7 @@
     /* ── HUD ── */
     #hud {
       width: 100%;
-      max-width: 800px;
+      max-width: 1000px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -43,7 +43,7 @@
     #game-wrap {
       position: relative;
       width: 100%;
-      max-width: 800px;
+      max-width: 1000px;
     }
     #c {
       display: block;
@@ -249,8 +249,8 @@
 
 <!-- Game -->
 <div id="game-wrap" style="display:none">
-  <canvas id="c" width="800" height="600"></canvas>
-  <div id="key-hints">← → MOVE &nbsp;|&nbsp; ENTER / SPACE INSPECT &nbsp;|&nbsp; CLICK NODE TO INSPECT</div>
+  <canvas id="c" width="1000" height="600"></canvas>
+  <div id="key-hints">← → MOVE MAIN PATH &nbsp;|&nbsp; ↓ W4 QUIZ &nbsp;|&nbsp; ↑ W7 QUIZ &nbsp;|&nbsp; ENTER INSPECT &nbsp;|&nbsp; CLICK NODE</div>
 </div>
 
 <!-- Modal -->
@@ -276,74 +276,99 @@
 // ══════════════════════════════════════════════════════════════════
 //  Constants
 // ══════════════════════════════════════════════════════════════════
-const CW = 800, CH = 600;
+const CW = 1000, CH = 600;
 const NR = 22;
+const MAIN_PATH_LEN = 12;   // indices 0–11 on the main trail
 
-// S-curve node layout (unchanged)
+// ── Node layout — 12 main path + 2 quiz side-branches ────────────
 const NODES = [
-  {x:100, y:500},   // W1  — desert
-  {x:250, y:480},   // W2  — desert
-  {x:400, y:510},   // W3  — desert
-  {x:550, y:460},   // W4  — desert (quiz)
-  {x:650, y:350},   // W5  — jungle
-  {x:500, y:300},   // W6  — jungle
-  {x:350, y:280},   // W7  — jungle (quiz)
-  {x:200, y:250},   // W8  — jungle
-  {x:300, y:150},   // W9  — jungle
-  {x:500, y:120},   // W10 — cyber
-  {x:700, y:100},   // W11 — cyber FINAL
+  {x:100,  y:500},                               // 0  W1   desert start
+  {x:220,  y:480},                               // 1  W2   desert
+  {x:340,  y:510},                               // 2  W3   desert
+  {x:460,  y:470},                               // 3  W4   desert (branch origin ↓)
+  {x:580,  y:360},                               // 4  W5   jungle entry
+  {x:460,  y:300},                               // 5  W6   jungle
+  {x:340,  y:260},                               // 6  W7   jungle (branch origin ↑)
+  {x:220,  y:220},                               // 7  W8   jungle
+  {x:360,  y:140},                               // 8  W9   jungle endpoint
+  {x:520,  y:120},                               // 9  W10  cyber entry
+  {x:700,  y:100},                               // 10 W11  cyber
+  {x:880,  y: 90},                               // 11 W12  cyber peak
+  {x:460,  y:560, isBranch:true, branchFrom:3},  // 12 W4 Quiz (↓ from W4)
+  {x:340,  y:160, isBranch:true, branchFrom:6},  // 13 W7 Quiz (↑ from W7)
 ];
 
-// ── Zone assignment (index-based) ─────────────────────────────────
+// Nodes whose quiz branch is navigable via ↓ / ↑
+const BRANCH_DOWN = { 3: 12 };   // W4 → W4 Quiz
+const BRANCH_UP   = { 6: 13 };   // W7 → W7 Quiz
+
+// ── Zone helper ───────────────────────────────────────────────────
 function nodeZone(i) {
+  const n = NODES[i];
+  if (n && n.isBranch) return nodeZone(n.branchFrom);
   return i <= 3 ? 'desert' : i <= 8 ? 'jungle' : 'cyber';
+}
+
+// Use parent week data for branch nodes; branch nodes borrow branchFrom week
+function weekData(i) {
+  const n   = NODES[i];
+  const idx = (n && n.isBranch) ? n.branchFrom : i;
+  return weeks[idx] || {admin_step:0, max_points:0, user_score:null, week:'', theme:'', objectives:''};
+}
+
+function isUnlocked(i) {
+  return weekData(i).admin_step === 1;
 }
 
 // ── Desert cacti ──────────────────────────────────────────────────
 const CACTI = [
-  {x: 62,  y: 565, h: 42},
+  {x:  62, y: 565, h: 42},
   {x: 178, y: 558, h: 30},
   {x: 335, y: 572, h: 26},
   {x: 462, y: 568, h: 38},
   {x: 638, y: 556, h: 28},
   {x: 748, y: 562, h: 34},
+  {x: 842, y: 570, h: 30},
+  {x: 952, y: 560, h: 36},
 ];
 
 // ── Jungle trees ──────────────────────────────────────────────────
 const JUNGLE_TREES = [
-  {x:30,  y:225}, {x:55,  y:255}, {x:32,  y:295},
-  {x:24,  y:345}, {x:48,  y:375},
-  {x:756, y:210}, {x:779, y:240}, {x:762, y:270},
-  {x:770, y:332},
-  {x:162, y:355}, {x:186, y:378},
-  {x:458, y:240}, {x:482, y:265},
-  {x:598, y:335},
-  {x:288, y:395},
-  {x:640, y:252},
-  {x:372, y:210},
-  {x:205, y:195}, {x:550, y:192},
+  {x: 30,  y:225}, {x: 55,  y:255}, {x: 32,  y:295},
+  {x: 24,  y:345}, {x: 48,  y:375},
+  {x:756,  y:210}, {x:779,  y:240}, {x:762,  y:270},
+  {x:770,  y:332},
+  {x:162,  y:355}, {x:186,  y:378},
+  {x:458,  y:240}, {x:482,  y:265},
+  {x:598,  y:335},
+  {x:288,  y:395},
+  {x:640,  y:252},
+  {x:372,  y:210},
+  {x:205,  y:195}, {x:550,  y:192},
 ];
 
 // ── Cyber server towers ───────────────────────────────────────────
 const SERVER_TOWERS = [
-  {x: 78,  y: 168},
+  {x:  78, y: 168},
   {x: 432, y: 163},
   {x: 762, y: 155},
+  {x: 942, y: 145},
 ];
 
-// ── Drifting clouds (float in upper zone) ────────────────────────
+// ── Drifting clouds ───────────────────────────────────────────────
 const CLOUDS = [
-  {x: 80,  y:40, baseY:40, w:80, s:.28},
+  {x:  80, y:40, baseY:40, w:80, s:.28},
   {x: 300, y:55, baseY:55, w:62, s:.18},
-  {x: 512, y:32, baseY:32, w:88, s:.34},
-  {x: 682, y:50, baseY:50, w:68, s:.22},
-  {x: 835, y:40, baseY:40, w:56, s:.30},
+  {x: 520, y:32, baseY:32, w:88, s:.34},
+  {x: 720, y:50, baseY:50, w:68, s:.22},
+  {x: 890, y:40, baseY:40, w:56, s:.30},
+  {x:1060, y:46, baseY:46, w:72, s:.24},
 ];
 
 // ── Scorpions (desert) ────────────────────────────────────────────
 const SCORPIONS = [
   {x: 170, y: 550, dir:  1, baseX: 170},
-  {x: 488, y: 553, dir: -1, baseX: 488},
+  {x: 524, y: 553, dir: -1, baseX: 524},
 ];
 
 // ── Snakes (jungle) ───────────────────────────────────────────────
@@ -353,11 +378,12 @@ const SNAKES = [
   {x: 136, y: 222, phase: 3.0, baseX: 136},
 ];
 
-// ── Cyan data packets along cyber path segments ───────────────────
+// ── Cyan data packets along cyber segments ────────────────────────
 const DATA_PACKETS = [
-  {seg: 8, t: 0.40, speed: 0.0090},
-  {seg: 9, t: 0.05, speed: 0.0120},
-  {seg: 9, t: 0.65, speed: 0.0095},
+  {seg: 8,  t: 0.40, speed: 0.0090},
+  {seg: 9,  t: 0.05, speed: 0.0120},
+  {seg: 9,  t: 0.65, speed: 0.0095},
+  {seg: 10, t: 0.35, speed: 0.0110},
 ];
 
 // ── Pixel-art player sprite — 8×12 grid @ 2 px/cell ──────────────
@@ -395,7 +421,6 @@ const ctx    = canvas.getContext('2d');
 //  Background — three layered biome gradients
 // ══════════════════════════════════════════════════════════════════
 function drawBackground() {
-  // Base: deep jungle canvas
   const jg = ctx.createLinearGradient(0, 0, 0, CH);
   jg.addColorStop(0,   '#1a330e');
   jg.addColorStop(0.5, '#234a14');
@@ -403,7 +428,6 @@ function drawBackground() {
   ctx.fillStyle = jg;
   ctx.fillRect(0, 0, CW, CH);
 
-  // Desert overlay — bottom portion fades in from y≈330
   const dg = ctx.createLinearGradient(0, 320, 0, CH);
   dg.addColorStop(0,    'rgba(200,148,65,0)');
   dg.addColorStop(0.22, 'rgba(218,175,110,0.82)');
@@ -411,7 +435,6 @@ function drawBackground() {
   ctx.fillStyle = dg;
   ctx.fillRect(0, 320, CW, CH - 320);
 
-  // Cyber overlay — top portion, dark slate
   const cg = ctx.createLinearGradient(0, 0, 0, 220);
   cg.addColorStop(0,    'rgba(10,13,30,1)');
   cg.addColorStop(0.65, 'rgba(20,26,55,0.88)');
@@ -420,7 +443,7 @@ function drawBackground() {
   ctx.fillRect(0, 0, CW, 220);
 }
 
-// ── Isometric cyber grid (clipped to top zone) ───────────────────
+// ── Isometric cyber grid ──────────────────────────────────────────
 function drawCyberGrid() {
   ctx.save();
   ctx.beginPath();
@@ -429,29 +452,27 @@ function drawCyberGrid() {
   ctx.globalAlpha = 0.14;
   ctx.strokeStyle = '#00FFFF';
   ctx.lineWidth   = 0.6;
-
-  // Horizontal scan lines
   for (let y = 0; y <= 210; y += 22) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CW, y); ctx.stroke();
   }
-  // Angled verticals for pseudo-isometric feel
   for (let x = -CW; x < CW * 2; x += 32) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 110, 210); ctx.stroke();
   }
   ctx.restore();
 }
 
-// ── Sand dunes (desert floor texture) ────────────────────────────
+// ── Sand dunes ────────────────────────────────────────────────────
 function drawSandDunes() {
   ctx.save();
-  ctx.fillStyle = 'rgba(190,138,52,0.30)';
   [
     [88,  510, 125, 0.30],
     [310, 530, 100, 0.25],
     [568, 508, 115, 0.28],
     [725, 528,  85, 0.22],
+    [900, 520,  95, 0.24],
   ].forEach(([cx, cy, rx, a]) => {
     ctx.globalAlpha = a;
+    ctx.fillStyle   = 'rgba(190,138,52,0.30)';
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, rx * 0.28, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -462,7 +483,6 @@ function drawSandDunes() {
 // ── Oasis near W2 ────────────────────────────────────────────────
 function drawOasis() {
   const ox = 252, oy = 546;
-  // Water pool
   ctx.save();
   ctx.globalAlpha = 0.72;
   const wg = ctx.createRadialGradient(ox, oy, 2, ox, oy, 30);
@@ -473,12 +493,8 @@ function drawOasis() {
   ctx.ellipse(ox, oy, 30, 14, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
-
-  // Palm trunk
   ctx.fillStyle = '#6d4c1f';
   ctx.fillRect(ox - 3, oy - 36, 6, 36);
-
-  // Fronds
   const fronds = [[-28,-8],[28,-8],[0,-22],[-18,-20],[18,-20]];
   fronds.forEach(([dx, dy]) => {
     ctx.strokeStyle = '#2e7d32';
@@ -488,7 +504,6 @@ function drawOasis() {
     ctx.moveTo(ox, oy - 34);
     ctx.quadraticCurveTo(ox + dx * 0.45, oy + dy * 0.5 - 18, ox + dx, oy + dy - 34);
     ctx.stroke();
-    // Leaf tip darkening
     ctx.strokeStyle = '#1b5e20';
     ctx.lineWidth   = 1;
     ctx.beginPath();
@@ -500,87 +515,56 @@ function drawOasis() {
 
 // ── Pixel cactus ─────────────────────────────────────────────────
 function drawCactus(x, y, h) {
-  const col  = '#2d6a1e';
-  const dark = '#1a4011';
-  const tip  = '#4caf50';
-  // Main trunk
-  ctx.fillStyle = col;
-  ctx.fillRect(x - 4, y - h, 8, h);
-  ctx.fillStyle = dark;
-  ctx.fillRect(x + 2, y - h + 5, 2, h - 5);
-  ctx.fillStyle = tip;
-  ctx.fillRect(x - 3, y - h, 6, 3);
-  // Left arm
+  const col = '#2d6a1e', dark = '#1a4011', tip = '#4caf50';
+  ctx.fillStyle = col;  ctx.fillRect(x - 4, y - h, 8, h);
+  ctx.fillStyle = dark; ctx.fillRect(x + 2, y - h + 5, 2, h - 5);
+  ctx.fillStyle = tip;  ctx.fillRect(x - 3, y - h, 6, 3);
   if (h > 24) {
     const ay = y - Math.round(h * 0.62);
     ctx.fillStyle = col;
     ctx.fillRect(x - 14, ay, 10, 5);
     ctx.fillRect(x - 14, ay - 12, 5, 14);
-    ctx.fillStyle = dark;
-    ctx.fillRect(x - 12, ay, 3, 5);
-    ctx.fillStyle = tip;
-    ctx.fillRect(x - 13, ay - 12, 4, 3);
+    ctx.fillStyle = dark; ctx.fillRect(x - 12, ay, 3, 5);
+    ctx.fillStyle = tip;  ctx.fillRect(x - 13, ay - 12, 4, 3);
   }
-  // Right arm
   if (h > 28) {
     const ay = y - Math.round(h * 0.42);
     ctx.fillStyle = col;
     ctx.fillRect(x + 4, ay, 10, 5);
     ctx.fillRect(x + 9, ay - 16, 5, 18);
-    ctx.fillStyle = dark;
-    ctx.fillRect(x + 6, ay, 3, 5);
-    ctx.fillStyle = tip;
-    ctx.fillRect(x + 8, ay - 16, 5, 3);
+    ctx.fillStyle = dark; ctx.fillRect(x + 6, ay, 3, 5);
+    ctx.fillStyle = tip;  ctx.fillRect(x + 8, ay - 16, 5, 3);
   }
 }
 
-// ── Jungle tree (lush overlapping circles) ───────────────────────
+// ── Jungle tree ───────────────────────────────────────────────────
 function jungleTree(x, y) {
-  // Trunk
-  ctx.fillStyle = '#4e2d10';
-  ctx.fillRect(x - 3, y, 6, 20);
-  ctx.fillStyle = '#3a2008';
-  ctx.fillRect(x + 1, y + 4, 2, 16);
-
-  // Leaf clusters: back→front layering
+  ctx.fillStyle = '#4e2d10'; ctx.fillRect(x - 3, y, 6, 20);
+  ctx.fillStyle = '#3a2008'; ctx.fillRect(x + 1, y + 4, 2, 16);
   [
-    {dx:  0, dy:  0, r: 18, c: '#1b5e20'},
-    {dx: -9, dy: -8, r: 13, c: '#2e7d32'},
-    {dx:  9, dy: -6, r: 12, c: '#33691e'},
-    {dx:  0, dy:-18, r: 14, c: '#388e3c'},
-    {dx: -5, dy:-26, r: 10, c: '#43a047'},
-    {dx:  5, dy:-24, r:  9, c: '#4caf50'},
+    {dx:  0, dy:  0, r:18, c:'#1b5e20'}, {dx: -9, dy: -8, r:13, c:'#2e7d32'},
+    {dx:  9, dy: -6, r:12, c:'#33691e'}, {dx:  0, dy:-18, r:14, c:'#388e3c'},
+    {dx: -5, dy:-26, r:10, c:'#43a047'}, {dx:  5, dy:-24, r: 9, c:'#4caf50'},
   ].forEach(({dx, dy, r, c}) => {
     ctx.fillStyle = c;
-    ctx.beginPath();
-    ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill();
   });
 }
 
 // ── Cyber server tower ───────────────────────────────────────────
 function drawServerTower(x, y) {
   const tw = 24, th = 44;
-  // Shadow base
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.fillRect(x - tw/2 + 3, y + 3, tw, 4);
-
-  // Tower body
   ctx.fillStyle = '#151a30';
   ctx.fillRect(x - tw/2, y - th, tw, th);
-  ctx.strokeStyle = '#00FFFF';
-  ctx.lineWidth   = 1;
+  ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1;
   ctx.strokeRect(x - tw/2, y - th, tw, th);
-
-  // Horizontal dividers
-  ctx.strokeStyle = 'rgba(0,255,255,0.25)';
-  ctx.lineWidth   = 0.5;
+  ctx.strokeStyle = 'rgba(0,255,255,0.25)'; ctx.lineWidth = 0.5;
   for (let d = 1; d < 4; d++) {
     const dy = y - th + d * (th / 4);
     ctx.beginPath(); ctx.moveTo(x - tw/2, dy); ctx.lineTo(x + tw/2, dy); ctx.stroke();
   }
-
-  // LED indicator rows
   for (let row = 0; row < 4; row++) {
     const ly    = y - th + 7 + row * 10;
     const pulse = 0.5 + 0.5 * Math.abs(Math.sin(frame * 0.055 + row * 0.9));
@@ -590,24 +574,15 @@ function drawServerTower(x, y) {
     ctx.fillRect(x + 3, ly, 5, 3);
     ctx.globalAlpha = 1;
   }
-
-  // Pulsing core
   const pulseR = 4 + 2.5 * Math.abs(Math.sin(frame * 0.075));
   ctx.save();
-  ctx.shadowColor = '#FF00FF';
-  ctx.shadowBlur  = 14;
+  ctx.shadowColor = '#FF00FF'; ctx.shadowBlur = 14;
   ctx.fillStyle   = '#FF00FF';
-  ctx.beginPath();
-  ctx.arc(x, y - th / 2, pulseR, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y - th / 2, pulseR, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
-
-  // Antenna
-  ctx.strokeStyle = '#00FFFF';
-  ctx.lineWidth   = 1.5;
+  ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(x, y - th); ctx.lineTo(x, y - th - 12); ctx.stroke();
-  const blink = Math.abs(Math.sin(frame * 0.12)) > 0.5;
-  if (blink) {
+  if (Math.abs(Math.sin(frame * 0.12)) > 0.5) {
     ctx.fillStyle = '#FF0080';
     ctx.beginPath(); ctx.arc(x, y - th - 12, 2.5, 0, Math.PI * 2); ctx.fill();
   }
@@ -617,16 +592,14 @@ function drawServerTower(x, y) {
 function cloud({x, y, w}) {
   ctx.fillStyle = 'rgba(255,255,255,0.70)';
   [
-    {dx: 0,     dy: 0,      r: w * 0.28},
-    {dx: w*.22, dy: -w*.07, r: w * 0.20},
-    {dx: w*.44, dy: 0,      r: w * 0.24},
-    {dx: w*.62, dy:  w*.04, r: w * 0.16},
+    {dx:0,     dy:0,      r:w*.28}, {dx:w*.22, dy:-w*.07, r:w*.20},
+    {dx:w*.44, dy:0,      r:w*.24}, {dx:w*.62, dy: w*.04, r:w*.16},
   ].forEach(({dx, dy, r}) => {
     ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill();
   });
 }
 
-// ── Bezier control point (shared formula) ────────────────────────
+// ── Bezier control point (shared formula for main path) ──────────
 function getControlPoint(i) {
   const p1   = NODES[i], p2 = NODES[i + 1];
   const sign = i % 2 === 0 ? 1 : -1;
@@ -636,111 +609,105 @@ function getControlPoint(i) {
   };
 }
 
-// ── Zone-specific bezier paths ────────────────────────────────────
+// ── Helper: stroke one quadratic bezier with current style ───────
+function strokeBez(p1, cpx, cpy, p2) {
+  ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
+  ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
+}
+
+// ── Draw one main-path segment (zone-specific styling) ───────────
+function drawMainSegment(i) {
+  const unl  = isUnlocked(i);
+  const {x: cpx, y: cpy} = getControlPoint(i);
+  const p1 = NODES[i], p2 = NODES[i + 1];
+  const zone = nodeZone(i);
+
+  ctx.setLineDash([]);
+
+  if (zone === 'cyber' && unl) {
+    ctx.save();
+    ctx.shadowColor = '#00FFFF'; ctx.shadowBlur = 18;
+    ctx.strokeStyle = '#001a1a'; ctx.lineWidth = 22; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = '#004444'; ctx.lineWidth = 14; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = '#00FFFF'; ctx.lineWidth =  4; strokeBez(p1,cpx,cpy,p2);
+    ctx.shadowBlur  = 0;
+    ctx.strokeStyle = 'rgba(0,255,255,0.45)'; ctx.lineWidth = 2;
+    ctx.setLineDash([8, 7]); strokeBez(p1,cpx,cpy,p2);
+    ctx.restore();
+  } else if (zone === 'cyber') {
+    ctx.strokeStyle = '#1a0022'; ctx.lineWidth = 22;
+    ctx.setLineDash([]); strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = 'rgba(80,0,100,0.4)'; ctx.lineWidth = 4;
+    ctx.setLineDash([6, 8]); strokeBez(p1,cpx,cpy,p2);
+  } else if (zone === 'desert') {
+    ctx.strokeStyle = unl ? '#4a2a0a' : '#211808'; ctx.lineWidth = 24; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? '#c07820' : '#382812'; ctx.lineWidth = 16; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? '#e0a838' : '#4a3818'; ctx.lineWidth =  8; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? 'rgba(255,225,130,0.5)' : 'rgba(170,140,70,0.15)';
+    ctx.lineWidth = 3; ctx.setLineDash([12, 10]); strokeBez(p1,cpx,cpy,p2);
+  } else {
+    ctx.strokeStyle = unl ? '#241400' : '#160e08'; ctx.lineWidth = 24; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? '#5c3418' : '#2a1c10'; ctx.lineWidth = 16; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? '#7a4c28' : '#382414'; ctx.lineWidth =  8; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? 'rgba(165,120,70,0.48)' : 'rgba(110,80,50,0.18)';
+    ctx.lineWidth = 3; ctx.setLineDash([12, 10]); strokeBez(p1,cpx,cpy,p2);
+  }
+}
+
+// ── Draw a side-branch segment (thinner, same zone palette) ──────
+function drawBranchSegment(fromIdx, toIdx) {
+  const p1   = NODES[fromIdx], p2 = NODES[toIdx];
+  const unl  = isUnlocked(fromIdx);
+  const zone = nodeZone(fromIdx);
+  // Straight control point → near-vertical/horizontal line
+  const cpx  = (p1.x + p2.x) / 2;
+  const cpy  = (p1.y + p2.y) / 2;
+
+  ctx.save();
+  ctx.lineCap  = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([]);
+
+  if (zone === 'desert') {
+    ctx.strokeStyle = unl ? '#5c3a10' : '#2a1808'; ctx.lineWidth = 14; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? '#d4a040' : '#3a2810'; ctx.lineWidth =  7; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? 'rgba(255,220,100,0.6)' : 'rgba(150,120,60,0.2)';
+    ctx.lineWidth = 3; ctx.setLineDash([10, 8]); strokeBez(p1,cpx,cpy,p2);
+  } else {
+    // Jungle
+    ctx.strokeStyle = unl ? '#241400' : '#140e08'; ctx.lineWidth = 14; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? '#7a4c28' : '#2e1c10'; ctx.lineWidth =  7; strokeBez(p1,cpx,cpy,p2);
+    ctx.strokeStyle = unl ? 'rgba(165,110,60,0.55)' : 'rgba(100,70,40,0.2)';
+    ctx.lineWidth = 3; ctx.setLineDash([10, 8]); strokeBez(p1,cpx,cpy,p2);
+  }
+
+  // Fork indicator: small diamond at branch origin
+  if (unl) {
+    ctx.setLineDash([]);
+    const mx = p1.x, my = p1.y + (p2.y > p1.y ? NR + 3 : -(NR + 3));
+    ctx.fillStyle = 'rgba(255,220,50,0.85)';
+    ctx.beginPath();
+    ctx.moveTo(mx, my - 5); ctx.lineTo(mx + 5, my);
+    ctx.lineTo(mx, my + 5); ctx.lineTo(mx - 5, my);
+    ctx.closePath(); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ── All paths ─────────────────────────────────────────────────────
 function paths() {
   ctx.save();
   ctx.lineCap  = 'round';
   ctx.lineJoin = 'round';
-
-  for (let i = 0; i < NODES.length - 1; i++) {
-    const unlocked = (weeks[i] || {}).admin_step === 1;
-    const {x: cpx, y: cpy} = getControlPoint(i);
-    const p1 = NODES[i], p2 = NODES[i + 1];
-    const zone = nodeZone(i);
-
+  // Main trail: W1 → W2 → … → W12
+  for (let i = 0; i < MAIN_PATH_LEN - 1; i++) {
+    drawMainSegment(i);
     ctx.setLineDash([]);
-
-    if (zone === 'cyber' && unlocked) {
-      // Neon cyan path with glow
-      ctx.save();
-      ctx.shadowColor = '#00FFFF';
-      ctx.shadowBlur  = 18;
-      // Dark channel base
-      ctx.strokeStyle = '#001a1a';
-      ctx.lineWidth   = 22;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-      // Teal fill
-      ctx.strokeStyle = '#004444';
-      ctx.lineWidth   = 14;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-      // Bright cyan edge
-      ctx.strokeStyle = '#00FFFF';
-      ctx.lineWidth   = 4;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-      ctx.shadowBlur = 0;
-      // Dashed data flow
-      ctx.strokeStyle = 'rgba(0,255,255,0.45)';
-      ctx.lineWidth   = 2;
-      ctx.setLineDash([8, 7]);
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-      ctx.restore();
-
-    } else if (zone === 'desert') {
-      // Sandstone road
-      ctx.strokeStyle = unlocked ? '#4a2a0a' : '#211808';
-      ctx.lineWidth   = 24;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-
-      ctx.strokeStyle = unlocked ? '#c07820' : '#382812';
-      ctx.lineWidth   = 16;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-
-      ctx.strokeStyle = unlocked ? '#e0a838' : '#4a3818';
-      ctx.lineWidth   = 8;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-
-      ctx.strokeStyle = unlocked ? 'rgba(255,225,130,0.5)' : 'rgba(170,140,70,0.15)';
-      ctx.lineWidth   = 3;
-      ctx.setLineDash([12, 10]);
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-
-    } else {
-      // Jungle mud trail
-      ctx.strokeStyle = unlocked ? '#241400' : '#160e08';
-      ctx.lineWidth   = 24;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-
-      ctx.strokeStyle = unlocked ? '#5c3418' : '#2a1c10';
-      ctx.lineWidth   = 16;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-
-      ctx.strokeStyle = unlocked ? '#7a4c28' : '#382414';
-      ctx.lineWidth   = 8;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-
-      ctx.strokeStyle = unlocked ? 'rgba(165,120,70,0.48)' : 'rgba(110,80,50,0.18)';
-      ctx.lineWidth   = 3;
-      ctx.setLineDash([12, 10]);
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-    }
-
-    // Locked cyber segment: dim magenta outline
-    if (zone === 'cyber' && !unlocked) {
-      ctx.strokeStyle = '#1a0022';
-      ctx.lineWidth   = 22;
-      ctx.setLineDash([]);
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-      ctx.strokeStyle = 'rgba(80,0,100,0.4)';
-      ctx.lineWidth   = 4;
-      ctx.setLineDash([6, 8]);
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-    }
   }
-
+  // Side branches
+  drawBranchSegment(3,  12);  // W4 → W4 Quiz (↓)
+  drawBranchSegment(6,  13);  // W7 → W7 Quiz (↑)
   ctx.setLineDash([]);
   ctx.restore();
 }
@@ -748,54 +715,41 @@ function paths() {
 // ── Pixel padlock icon ────────────────────────────────────────────
 function drawPadlock(x, y) {
   const s = 7;
-  ctx.strokeStyle = '#777';
-  ctx.lineWidth   = 2;
-  ctx.lineCap     = 'round';
-  ctx.beginPath();
-  ctx.arc(x, y - s * 0.42, s * 0.33, Math.PI, 0);
-  ctx.stroke();
+  ctx.strokeStyle = '#777'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x, y - s * 0.42, s * 0.33, Math.PI, 0); ctx.stroke();
   ctx.fillStyle = '#555';
   ctx.fillRect(x - s * 0.46, y - s * 0.18, s * 0.92, s * 0.75);
   ctx.fillStyle = '#2a2a2a';
-  ctx.beginPath();
-  ctx.arc(x, y + s * 0.12, s * 0.14, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y + s * 0.12, s * 0.14, 0, Math.PI * 2); ctx.fill();
   ctx.fillRect(x - s * 0.06, y + s * 0.12, s * 0.12, s * 0.22);
 }
 
-// ── Zone-themed nodes ─────────────────────────────────────────────
+// ── All nodes (main path + branches) ─────────────────────────────
 function nodes() {
-  weeks.forEach((w, i) => {
-    if (i >= NODES.length) return;
-    const {x, y} = NODES[i];
-    const locked    = w.admin_step === 0;
-    const completed = w.user_score != null && w.user_score > 0;
-    const isCur     = i === cur;
-    const zone      = nodeZone(i);
+  NODES.forEach((node, i) => {
+    const {x, y}   = node;
+    const w        = weekData(i);
+    const locked   = w.admin_step === 0;
+    const completed= w.user_score != null && w.user_score > 0;
+    const isCur    = i === cur;
+    const zone     = nodeZone(i);
+    const isQuiz   = !!node.isBranch;
 
-    // Pulsing aura for unlocked nodes
+    // Pulsing aura
     if (!locked) {
       const phase     = Math.abs(Math.sin(frame * 0.038 + i * 0.55));
       const auraR     = NR + 5 + phase * 9;
       const auraAlpha = 0.12 + phase * 0.28;
       let auraColor;
       if (zone === 'cyber') {
-        auraColor = completed
-          ? `rgba(255,0,255,${auraAlpha})`
-          : `rgba(0,255,255,${auraAlpha})`;
+        auraColor = completed ? `rgba(255,0,255,${auraAlpha})` : `rgba(0,255,255,${auraAlpha})`;
       } else if (zone === 'desert') {
-        auraColor = completed
-          ? `rgba(255,185,0,${auraAlpha})`
-          : `rgba(245,195,70,${auraAlpha})`;
+        auraColor = completed ? `rgba(255,185,0,${auraAlpha})` : `rgba(245,195,70,${auraAlpha})`;
       } else {
-        auraColor = completed
-          ? `rgba(255,200,0,${auraAlpha})`
-          : `rgba(80,210,80,${auraAlpha})`;
+        auraColor = completed ? `rgba(255,200,0,${auraAlpha})` : `rgba(80,210,80,${auraAlpha})`;
       }
-      ctx.beginPath();
-      ctx.arc(x, y, auraR, 0, Math.PI * 2);
-      ctx.fillStyle = auraColor;
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, auraR, 0, Math.PI * 2);
+      ctx.fillStyle = auraColor; ctx.fill();
     }
 
     // Selection ring
@@ -805,74 +759,60 @@ function nodes() {
       ctx.shadowBlur  = 22;
       ctx.beginPath(); ctx.arc(x, y, NR + 7, 0, Math.PI * 2);
       ctx.strokeStyle = zone === 'cyber' ? 'rgba(0,255,255,0.9)' : 'rgba(255,255,255,0.9)';
-      ctx.lineWidth   = 3;
-      ctx.stroke();
+      ctx.lineWidth   = 3; ctx.stroke();
       ctx.restore();
     }
 
-    // Node circle fill — zone-themed
+    // Fill
     ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2);
-
     if (locked) {
       const sg = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (zone === 'desert') {
-        sg.addColorStop(0, '#8a7050'); sg.addColorStop(1, '#4a3020');
-      } else if (zone === 'cyber') {
-        sg.addColorStop(0, '#1a2045'); sg.addColorStop(1, '#0c1030');
-      } else {
-        sg.addColorStop(0, '#3a4a30'); sg.addColorStop(1, '#1a2810');
-      }
+      if (zone === 'desert') { sg.addColorStop(0,'#8a7050'); sg.addColorStop(1,'#4a3020'); }
+      else if (zone === 'cyber') { sg.addColorStop(0,'#1a2045'); sg.addColorStop(1,'#0c1030'); }
+      else { sg.addColorStop(0,'#3a4a30'); sg.addColorStop(1,'#1a2810'); }
       ctx.fillStyle = sg;
-
+    } else if (isQuiz) {
+      // Quiz branch: gold-orange special fill
+      const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
+      if (completed) { g.addColorStop(0,'#FFD060'); g.addColorStop(0.6,'#c06000'); g.addColorStop(1,'#4a1800'); }
+      else           { g.addColorStop(0,'#FFF0A0'); g.addColorStop(0.6,'#d49020'); g.addColorStop(1,'#5a3000'); }
+      ctx.fillStyle = g;
     } else if (zone === 'cyber') {
-      // Holographic orb
       const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (completed) {
-        g.addColorStop(0, '#FF88FF'); g.addColorStop(0.6, '#CC00CC'); g.addColorStop(1, '#330033');
-      } else {
-        g.addColorStop(0, '#88FFFF'); g.addColorStop(0.6, '#008888'); g.addColorStop(1, '#002222');
-      }
+      if (completed) { g.addColorStop(0,'#FF88FF'); g.addColorStop(0.6,'#CC00CC'); g.addColorStop(1,'#330033'); }
+      else           { g.addColorStop(0,'#88FFFF'); g.addColorStop(0.6,'#008888'); g.addColorStop(1,'#002222'); }
       ctx.fillStyle = g;
-
     } else if (zone === 'desert') {
-      // Sandstone rock
       const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (completed) {
-        g.addColorStop(0, '#FFD060'); g.addColorStop(1, '#7a4400');
-      } else {
-        g.addColorStop(0, '#e8c060'); g.addColorStop(1, '#8a5c18');
-      }
+      if (completed) { g.addColorStop(0,'#FFD060'); g.addColorStop(1,'#7a4400'); }
+      else           { g.addColorStop(0,'#e8c060'); g.addColorStop(1,'#8a5c18'); }
       ctx.fillStyle = g;
-
     } else {
-      // Jungle: mossy stump
       const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (completed) {
-        g.addColorStop(0, '#FFE082'); g.addColorStop(1, '#D84900');
-      } else {
-        g.addColorStop(0, '#82E082'); g.addColorStop(1, '#165016');
-      }
+      if (completed) { g.addColorStop(0,'#FFE082'); g.addColorStop(1,'#D84900'); }
+      else           { g.addColorStop(0,'#82E082'); g.addColorStop(1,'#165016'); }
       ctx.fillStyle = g;
     }
     ctx.fill();
 
-    // Cyber scan-line effect (clipped to node circle)
+    // Cyber scan-line
     if (zone === 'cyber' && !locked) {
       ctx.save();
-      ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2);
-      ctx.clip();
+      ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.clip();
       ctx.globalAlpha = 0.28;
       ctx.fillStyle   = completed ? '#FF00FF' : '#00FFFF';
       const scanY = y - NR + ((frame * 2.2) % (NR * 2));
-      ctx.fillRect(x - NR, scanY - 1,      NR * 2, 1.5);
+      ctx.fillRect(x - NR, scanY - 1, NR * 2, 1.5);
       ctx.fillRect(x - NR, scanY - NR - 1, NR * 2, 1.5);
       ctx.restore();
     }
 
-    // Node border + cyber glow
+    // Border
     let borderColor;
     if (locked) {
       borderColor = zone === 'cyber' ? '#223' : '#444';
+    } else if (isQuiz) {
+      borderColor = completed ? '#FFD700' : '#d4a020';
     } else if (zone === 'cyber') {
       borderColor = completed ? '#FF00FF' : '#00FFFF';
     } else if (zone === 'desert') {
@@ -881,43 +821,47 @@ function nodes() {
       borderColor = completed ? '#FFD700' : '#0e3a0e';
     }
 
-    if (zone === 'cyber' && !locked) {
+    if ((zone === 'cyber' || isQuiz) && !locked) {
       ctx.save();
-      ctx.shadowColor = borderColor;
-      ctx.shadowBlur  = 14;
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth   = 3;
+      ctx.shadowColor = borderColor; ctx.shadowBlur = 14;
+      ctx.strokeStyle = borderColor; ctx.lineWidth  = 3;
       ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else {
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth   = 3;
-      ctx.stroke();
+      ctx.strokeStyle = borderColor; ctx.lineWidth = 3; ctx.stroke();
+    }
+
+    // Quiz outer ring (double-border to distinguish from main nodes)
+    if (isQuiz && !locked) {
+      ctx.strokeStyle = 'rgba(255,220,50,0.4)'; ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.arc(x, y, NR + 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // Label / padlock
+    const nodeLabel = isQuiz
+      ? `Q${node.branchFrom + 1}`
+      : `W${i + 1}`;
+
     if (locked) {
       drawPadlock(x, y);
       ctx.fillStyle    = zone === 'cyber' ? '#334466' : '#666';
       ctx.font         = 'bold 7px "Press Start 2P"';
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`W${i + 1}`, x, y + NR + 10);
+      ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(nodeLabel, x, y + NR + 10);
     } else {
-      ctx.fillStyle    = zone === 'cyber' ? '#00FFFF' : '#fff';
-      ctx.font         = `bold ${i < 9 ? 9 : 8}px "Press Start 2P"`;
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`W${i + 1}`, x, y);
+      ctx.fillStyle    = isQuiz ? '#FFD700' : (zone === 'cyber' ? '#00FFFF' : '#fff');
+      ctx.font         = `bold ${nodeLabel.length > 2 ? 8 : 9}px "Press Start 2P"`;
+      ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(nodeLabel, x, y);
 
       if (w.max_points > 0 && w.max_points <= 5) {
         const score = w.user_score || 0;
         let s = '';
         for (let k = 0; k < w.max_points; k++) s += k < score ? '★' : '☆';
         ctx.font      = '9px sans-serif';
-        ctx.fillStyle = completed
-          ? '#FFD700'
-          : (zone === 'cyber' ? '#00CCCC' : '#8a8');
+        ctx.fillStyle = completed ? '#FFD700' : (zone === 'cyber' ? '#00CCCC' : '#8a8');
         ctx.fillText(s, x, y + NR + 11);
       }
     }
@@ -933,7 +877,6 @@ function player() {
   const ph  = SPR.length    * ps;
   const px  = Math.round(x - pw / 2);
   const py  = Math.round(y - NR - ph - 4 + bob);
-
   SPR.forEach((row, ri) =>
     row.forEach((c, ci) => {
       if (!c) return;
@@ -941,7 +884,6 @@ function player() {
       ctx.fillRect(px + ci * ps, py + ri * ps, ps, ps);
     })
   );
-
   ctx.fillStyle = 'rgba(0,0,0,0.28)';
   ctx.beginPath();
   ctx.ellipse(x, y - NR - 2, 10, 3, 0, 0, Math.PI * 2);
@@ -951,7 +893,6 @@ function player() {
 // ══════════════════════════════════════════════════════════════════
 //  Creature updates & drawing
 // ══════════════════════════════════════════════════════════════════
-
 function updateScorpions() {
   SCORPIONS.forEach(s => {
     s.x += s.dir * 0.38;
@@ -960,46 +901,28 @@ function updateScorpions() {
 }
 
 function drawScorpion(x, y, dir) {
-  // Body
-  ctx.fillStyle = '#b8780a';
-  ctx.fillRect(x - 6, y - 5, 13, 8);
-  // Body highlight
-  ctx.fillStyle = '#d4960e';
-  ctx.fillRect(x - 5, y - 4, 11, 3);
-  // Head
+  ctx.fillStyle = '#b8780a'; ctx.fillRect(x - 6, y - 5, 13, 8);
+  ctx.fillStyle = '#d4960e'; ctx.fillRect(x - 5, y - 4, 11, 3);
   const hx = dir > 0 ? x + 6 : x - 10;
-  ctx.fillStyle = '#c88810';
-  ctx.fillRect(hx, y - 4, 5, 6);
-  // Eyes
-  ctx.fillStyle = '#ff2200';
-  ctx.fillRect(hx + (dir > 0 ? 3 : 0), y - 3, 1, 1);
-  // Claws
+  ctx.fillStyle = '#c88810'; ctx.fillRect(hx, y - 4, 5, 6);
+  ctx.fillStyle = '#ff2200'; ctx.fillRect(hx + (dir > 0 ? 3 : 0), y - 3, 1, 1);
   const clx = dir > 0 ? hx + 5 : hx - 4;
-  ctx.fillStyle = '#b8780a';
-  ctx.fillRect(clx, y - 5, 4, 3);
-  ctx.fillRect(clx, y,     4, 3);
+  ctx.fillStyle = '#b8780a'; ctx.fillRect(clx, y - 5, 4, 3); ctx.fillRect(clx, y, 4, 3);
   ctx.fillStyle = '#e0a820';
   ctx.fillRect(clx + (dir > 0 ? 2 : 0), y - 5, 2, 2);
   ctx.fillRect(clx + (dir > 0 ? 2 : 0), y,     2, 2);
-  // Tail segments arcing upward
   const td = dir > 0 ? -1 : 1;
   ctx.fillStyle = '#965c08';
   for (let k = 0; k < 5; k++) {
-    const tx = x + td * (k * 4 + 5);
-    const ty = y - 4 - k * 2.5;
-    ctx.fillRect(Math.round(tx), Math.round(ty), 4, 4);
+    ctx.fillRect(Math.round(x + td*(k*4+5)), Math.round(y-4-k*2.5), 4, 4);
   }
-  // Stinger
   ctx.fillStyle = '#ff3300';
-  const sx = x + td * (5 * 4 + 5);
-  ctx.fillRect(Math.round(sx) - 1, Math.round(y - 17), 3, 6);
-  // Legs
-  ctx.strokeStyle = '#965c08';
-  ctx.lineWidth   = 1;
+  ctx.fillRect(Math.round(x + td*(5*4+5)) - 1, Math.round(y - 17), 3, 6);
+  ctx.strokeStyle = '#965c08'; ctx.lineWidth = 1;
   for (let k = 0; k < 3; k++) {
     const lx = x - 4 + k * 4;
-    ctx.beginPath(); ctx.moveTo(lx, y + 2); ctx.lineTo(lx - 4, y + 8); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(lx, y + 2); ctx.lineTo(lx + 3, y + 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx, y+2); ctx.lineTo(lx-4, y+8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx, y+2); ctx.lineTo(lx+3, y+8); ctx.stroke();
   }
 }
 
@@ -1012,33 +935,20 @@ function updateSnakes() {
 
 function drawSnake(x, y, phase) {
   ctx.save();
-  const segs = 8;
-  // Draw tail→head
-  for (let k = segs; k >= 0; k--) {
-    const sx = x - k * 5 + Math.sin(phase + k * 0.88) * 7;
-    const sy = y + Math.cos(phase * 0.55 + k * 0.55) * 3.5;
-    const r  = k === 0 ? 5.5 : Math.max(1.8, 4.2 - k * 0.35);
-    if (k === 0) {
-      ctx.fillStyle = '#c62828'; // red head
-    } else {
-      ctx.fillStyle = k % 3 === 0 ? '#f9a825' : (k % 2 === 0 ? '#558b2f' : '#33691e');
-    }
-    ctx.beginPath();
-    ctx.arc(Math.round(sx), Math.round(sy), r, 0, Math.PI * 2);
-    ctx.fill();
+  for (let k = 8; k >= 0; k--) {
+    const sx = x - k*5 + Math.sin(phase + k*0.88)*7;
+    const sy = y + Math.cos(phase*0.55 + k*0.55)*3.5;
+    const r  = k === 0 ? 5.5 : Math.max(1.8, 4.2 - k*0.35);
+    ctx.fillStyle = k === 0 ? '#c62828' : (k%3===0 ? '#f9a825' : (k%2===0 ? '#558b2f' : '#33691e'));
+    ctx.beginPath(); ctx.arc(Math.round(sx), Math.round(sy), r, 0, Math.PI*2); ctx.fill();
   }
-  // Eyes on head
   ctx.fillStyle = '#ffff00';
-  ctx.fillRect(Math.round(x) + 3, Math.round(y) - 3, 2, 2);
-  ctx.fillRect(Math.round(x) + 3, Math.round(y) + 1, 2, 2);
-  // Tongue
-  ctx.strokeStyle = '#ff1744';
-  ctx.lineWidth   = 1;
+  ctx.fillRect(Math.round(x)+3, Math.round(y)-3, 2, 2);
+  ctx.fillRect(Math.round(x)+3, Math.round(y)+1, 2, 2);
+  ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(Math.round(x) + 8, Math.round(y));
-  ctx.lineTo(Math.round(x) + 12, Math.round(y) - 2);
-  ctx.moveTo(Math.round(x) + 8, Math.round(y));
-  ctx.lineTo(Math.round(x) + 12, Math.round(y) + 2);
+  ctx.moveTo(Math.round(x)+8, Math.round(y)); ctx.lineTo(Math.round(x)+12, Math.round(y)-2);
+  ctx.moveTo(Math.round(x)+8, Math.round(y)); ctx.lineTo(Math.round(x)+12, Math.round(y)+2);
   ctx.stroke();
   ctx.restore();
 }
@@ -1059,16 +969,14 @@ function updateDataPackets() {
 
 function drawDataPackets() {
   DATA_PACKETS.forEach(p => {
-    if (p.seg >= NODES.length - 1) return;
+    if (p.seg >= MAIN_PATH_LEN - 1) return;
     const cp  = getControlPoint(p.seg);
     const pos = getBezierPoint(NODES[p.seg], NODES[p.seg + 1], cp, p.t);
     ctx.save();
-    ctx.shadowColor = '#00FFFF';
-    ctx.shadowBlur  = 12;
+    ctx.shadowColor = '#00FFFF'; ctx.shadowBlur = 12;
     ctx.fillStyle   = '#00FFFF';
     ctx.fillRect(Math.round(pos.x) - 4, Math.round(pos.y) - 4, 8, 8);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle  = '#ffffff';
+    ctx.shadowBlur = 0; ctx.fillStyle = '#ffffff';
     ctx.fillRect(Math.round(pos.x) - 2, Math.round(pos.y) - 2, 4, 4);
     ctx.restore();
   });
@@ -1079,42 +987,34 @@ function drawDataPackets() {
 // ══════════════════════════════════════════════════════════════════
 function tick() {
   frame++;
-
   CLOUDS.forEach((c, i) => {
     c.x += c.s;
     c.y  = c.baseY + Math.sin(frame * 0.018 + i * 1.35) * 4;
     if (c.x - c.w > CW) c.x = -c.w;
   });
-
   updateScorpions();
   updateSnakes();
   updateDataPackets();
 
   ctx.clearRect(0, 0, CW, CH);
 
-  // ── Layer 1: biome backgrounds ──
   drawBackground();
   drawCyberGrid();
 
-  // ── Layer 2: terrain decorations ──
   drawSandDunes();
   drawOasis();
   CACTI.forEach(c => drawCactus(c.x, c.y, c.h));
   JUNGLE_TREES.forEach(t => jungleTree(t.x, t.y));
   SERVER_TOWERS.forEach(t => drawServerTower(t.x, t.y));
 
-  // ── Layer 3: clouds (float over upper zone) ──
   CLOUDS.forEach(cloud);
 
-  // ── Layer 4: paths ──
   paths();
 
-  // ── Layer 5: creatures ──
   SCORPIONS.forEach(s => drawScorpion(s.x, s.y, s.dir));
   SNAKES.forEach(s => drawSnake(s.x, s.y, s.phase));
   drawDataPackets();
 
-  // ── Layer 6: nodes + player ──
   nodes();
   player();
 
@@ -1129,12 +1029,30 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeModal(); e.preventDefault(); }
     return;
   }
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-    if (cur < weeks.length - 1) cur++;
+
+  const node = NODES[cur];
+
+  if (e.key === 'ArrowRight') {
+    // Advance along main path; branch nodes exit back to parent
+    if (node.isBranch) { cur = node.branchFrom; }
+    else if (cur < MAIN_PATH_LEN - 1) { cur++; }
     e.preventDefault();
-  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-    if (cur > 0) cur--;
+  } else if (e.key === 'ArrowLeft') {
+    if (node.isBranch) { cur = node.branchFrom; }
+    else if (cur > 0)  { cur--; }
     e.preventDefault();
+  } else if (e.key === 'ArrowDown') {
+    // Enter downward branch (W4 → W4 Quiz), or exit upward branch (W7 Quiz → W7)
+    if (BRANCH_DOWN[cur] !== undefined)  { cur = BRANCH_DOWN[cur]; e.preventDefault(); }
+    else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y < node.y) {
+      cur = node.branchFrom; e.preventDefault();
+    }
+  } else if (e.key === 'ArrowUp') {
+    // Enter upward branch (W7 → W7 Quiz), or exit downward branch (W4 Quiz → W4)
+    if (BRANCH_UP[cur] !== undefined)    { cur = BRANCH_UP[cur];   e.preventDefault(); }
+    else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y > node.y) {
+      cur = node.branchFrom; e.preventDefault();
+    }
   } else if (e.key === 'Enter' || e.key === ' ') {
     openModal(cur); e.preventDefault();
   }
@@ -1156,10 +1074,17 @@ canvas.addEventListener('click', e => {
 //  Modal
 // ══════════════════════════════════════════════════════════════════
 function openModal(idx) {
-  const w = weeks[idx];
+  const node  = NODES[idx];
+  const isQuiz= node && node.isBranch;
+  const w     = weekData(idx);
   if (!w) return;
 
-  document.getElementById('m-week').textContent  = w.week  || `Week ${idx + 1}`;
+  // Branch nodes show "QUIZ — Week N", main nodes show their own week label
+  const weekLabel = isQuiz
+    ? `${w.week || `Week ${node.branchFrom + 1}`} — QUIZ`
+    : (w.week || `Week ${idx + 1}`);
+
+  document.getElementById('m-week').textContent  = weekLabel;
   document.getElementById('m-theme').textContent = w.theme || '';
 
   const rawObjs = (w.objectives || '').replace(/\r/g, '');
@@ -1243,9 +1168,10 @@ async function init() {
 
     const data = await res.json();
     username   = data.username || 'Guest';
-    weeks      = (data.weeks || []).slice(0, NODES.length);
+    // Clamp to main path length; branch nodes borrow from parent via weekData()
+    weeks      = (data.weeks || []).slice(0, MAIN_PATH_LEN);
 
-    while (weeks.length < NODES.length) {
+    while (weeks.length < MAIN_PATH_LEN) {
       weeks.push({
         week: `Week ${weeks.length + 1}`, theme: '',
         objectives: '', max_points: 0, admin_step: 0, user_score: null,
@@ -1253,6 +1179,7 @@ async function init() {
     }
 
     document.getElementById('hud-user').textContent = `👤 ${username.toUpperCase()}`;
+    // Score totals count only main-path weeks
     const tot = weeks.reduce((s, w) => s + (w.user_score || 0), 0);
     const max = weeks.reduce((s, w) => s + (w.max_points || 0), 0);
     document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
