@@ -270,6 +270,18 @@ async def syllabus_data(request: Request):
     })
 
 
+@app.get("/api/guest-data")
+async def guest_data():
+    """Public endpoint — returns mock course structure with no personal scores."""
+    mock = [dict(w) for w in MOCK_WEEKS]
+    return JSONResponse({
+        "username": "Guest",
+        "weeks": mock,
+        "user_col_found": False,
+        "guest": True,
+    })
+
+
 # ── Frontend ─────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)

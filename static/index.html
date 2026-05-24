@@ -298,6 +298,8 @@
   <p>Sign in with your HuggingFace account to view your progress.</p>
   <br/>
   <a href="/login" class="nes-btn is-primary">▶ LOGIN WITH HUGGINGFACE</a>
+  <br/><br/>
+  <button id="guest-mode-btn" class="nes-btn" style="color:#aaa">👁 GUEST MODE (EXPLORE MAP)</button>
 </div>
 
 <!-- Game -->
@@ -397,7 +399,7 @@ function weekData(i) {
 }
 
 function isUnlocked(i) {
-  return weekData(i).admin_step === 1;
+  return guestMode || weekData(i).admin_step === 1;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -465,10 +467,11 @@ const SPR_C = {
 // ══════════════════════════════════════════════════════════════════
 //  State
 // ══════════════════════════════════════════════════════════════════
-let weeks    = [];
-let cur      = 0;
-let frame    = 0;
-let username = '';
+let weeks     = [];
+let cur       = 0;
+let frame     = 0;
+let username  = '';
+let guestMode = false;
 
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
@@ -647,7 +650,7 @@ function nodes() {
   NODES.forEach((node, i) => {
     const {x, y}   = node;
     const w        = weekData(i);
-    const locked   = w.admin_step === 0;
+    const locked   = !guestMode && w.admin_step === 0;
     const completed= w.user_score != null && w.user_score > 0;
     const isCur    = i === cur;
     const zone     = nodeZone(i);
@@ -954,7 +957,7 @@ function openModal(idx) {
   const w      = weekData(idx);
   if (!w) return;
 
-  const locked = w.admin_step === 0;
+  const locked = !guestMode && w.admin_step === 0;
   const mp     = w.max_points;
   const sc     = w.user_score;
 
@@ -1052,6 +1055,29 @@ document.getElementById('modal-wrap').addEventListener('click', e => {
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+// ══════════════════════════════════════════════════════════════════
+//  Guest mode
+// ══════════════════════════════════════════════════════════════════
+async function startGuestMode() {
+  guestMode = true;
+  try {
+    const res  = await fetch('/api/guest-data');
+    const data = await res.json();
+    weeks    = data.weeks || [];
+    username = 'Guest';
+  } catch (_) {
+    weeks = [];
+  }
+  document.getElementById('hud-user').textContent  = '👤 GUEST';
+  document.getElementById('hud-score').textContent = '0 / 100 PTS';
+  document.getElementById('screen-login').style.display = 'none';
+  document.getElementById('game-wrap').style.display    = 'block';
+  cur = 0;
+  requestAnimationFrame(tick);
+}
+
+document.getElementById('guest-mode-btn').addEventListener('click', startGuestMode);
 
 // ══════════════════════════════════════════════════════════════════
 //  Data loading  ← OAuth / session cookie logic unchanged
