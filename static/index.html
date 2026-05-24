@@ -400,73 +400,47 @@ function isUnlocked(i) {
   return weekData(i).admin_step === 1;
 }
 
-// ── Desert cacti ──────────────────────────────────────────────────
-const CACTI = [
-  {x:  48, y: 548, h: 42},
-  {x: 162, y: 555, h: 30},
-  {x: 315, y: 545, h: 26},
-  {x: 455, y: 558, h: 38},
-  {x: 570, y: 548, h: 28},
-  {x: 660, y: 552, h: 34},
-  {x: 200, y: 565, h: 22},
-  {x: 510, y: 562, h: 30},
+// ══════════════════════════════════════════════════════════════════
+//  Animation overlay — decoration anchors & particle pool
+// ══════════════════════════════════════════════════════════════════
+
+// Swaying cacti (x, y = base of cactus trunk)
+const ANIM_CACTI = [
+  {x:  50, y: 520},
+  {x: 380, y: 540},
+  {x: 930, y: 560},
 ];
 
-// ── Jungle trees ──────────────────────────────────────────────────
-const JUNGLE_TREES = [
-  // Right flank near W5 (740,380) and W6 (740,280)
-  {x:768,  y:348}, {x:792,  y:385}, {x:778,  y:418},
-  {x:805,  y:295}, {x:825,  y:328},
-  // Middle jungle band near path y=248-315
-  {x:158,  y:258}, {x:188,  y:298},
-  {x:308,  y:252}, {x:338,  y:295},
-  {x:482,  y:258}, {x:508,  y:296},
-  {x:642,  y:258}, {x:668,  y:296},
-  // Above jungle path
-  {x:252,  y:248}, {x:452,  y:250},
-  {x:602,  y:252},
-  // Left boundary near W9 (240,280)
-  {x:198,  y:312}, {x:212,  y:348},
-];
+// Biome boundary boxes for particle loops
+const FIREFLY_BOUNDS = { minX: 150, maxX: 850, minY: 150, maxY: 380 };
+const DUST_BOUNDS    = { minX:   0, maxX: 1000, minY: 420, maxY: 600 };
 
-// ── Cyber server towers ───────────────────────────────────────────
-const SERVER_TOWERS = [
-  {x: 172, y: 145},
-  {x: 398, y: 140},
-  {x: 682, y: 138},
-  {x: 948, y: 145},
-];
-
-// ── Drifting clouds ───────────────────────────────────────────────
-const CLOUDS = [
-  {x:  80, y:40, baseY:40, w:80, s:.28},
-  {x: 300, y:55, baseY:55, w:62, s:.18},
-  {x: 520, y:32, baseY:32, w:88, s:.34},
-  {x: 720, y:50, baseY:50, w:68, s:.22},
-  {x: 890, y:40, baseY:40, w:56, s:.30},
-  {x:1060, y:46, baseY:46, w:72, s:.24},
-];
-
-// ── Scorpions (desert) ────────────────────────────────────────────
-const SCORPIONS = [
-  {x: 238, y: 545, dir:  1, baseX: 238},
-  {x: 552, y: 548, dir: -1, baseX: 552},
-];
-
-// ── Snakes (jungle) ───────────────────────────────────────────────
-const SNAKES = [
-  {x: 762, y: 398, phase: 0.0, baseX: 762},
-  {x: 488, y: 302, phase: 1.5, baseX: 488},
-  {x: 288, y: 300, phase: 3.0, baseX: 288},
-];
-
-// ── Cyan data packets along cyber segments ────────────────────────
-const DATA_PACKETS = [
-  {seg: 8,  t: 0.40, speed: 0.0090},
-  {seg: 9,  t: 0.05, speed: 0.0120},
-  {seg: 9,  t: 0.65, speed: 0.0095},
-  {seg: 10, t: 0.35, speed: 0.0110},
-];
+// Persistent particle pool — 10 fireflies (jungle) + 10 dust motes (desert)
+const PARTICLES = (() => {
+  const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+  const p = [];
+  for (let i = 0; i < 10; i++) {
+    p.push({
+      x: rnd(FIREFLY_BOUNDS.minX, FIREFLY_BOUNDS.maxX),
+      y: rnd(FIREFLY_BOUNDS.minY, FIREFLY_BOUNDS.maxY),
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: (Math.random() - 0.5) * 0.3,
+      phase: Math.random() * Math.PI * 2,
+      type: 'firefly',
+    });
+  }
+  for (let i = 0; i < 10; i++) {
+    p.push({
+      x: rnd(DUST_BOUNDS.minX, DUST_BOUNDS.maxX),
+      y: rnd(DUST_BOUNDS.minY, DUST_BOUNDS.maxY),
+      vx: -0.4 - Math.random() * 0.4,  // drifts left
+      vy: (Math.random() - 0.5) * 0.15,
+      phase: Math.random() * Math.PI * 2,
+      type: 'dust',
+    });
+  }
+  return p;
+})();
 
 // ── Pixel-art player sprite — 8×12 grid @ 2 px/cell ──────────────
 const SPR = [
@@ -506,122 +480,40 @@ ctx.webkitImageSmoothingEnabled  = false;
 
 
 
-// ── Oasis near W2 ────────────────────────────────────────────────
-function drawOasis() {
-  const ox = 275, oy = 535;
-  ctx.save();
-  ctx.globalAlpha = 0.72;
-  const wg = ctx.createRadialGradient(ox, oy, 2, ox, oy, 30);
-  wg.addColorStop(0, '#64b5f6');
-  wg.addColorStop(1, '#1565c0');
-  ctx.fillStyle = wg;
-  ctx.beginPath();
-  ctx.ellipse(ox, oy, 30, 14, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-  ctx.fillStyle = '#6d4c1f';
-  ctx.fillRect(ox - 3, oy - 36, 6, 36);
-  const fronds = [[-28,-8],[28,-8],[0,-22],[-18,-20],[18,-20]];
-  fronds.forEach(([dx, dy]) => {
-    ctx.strokeStyle = '#2e7d32';
-    ctx.lineWidth   = 3;
-    ctx.lineCap     = 'round';
-    ctx.beginPath();
-    ctx.moveTo(ox, oy - 34);
-    ctx.quadraticCurveTo(ox + dx * 0.45, oy + dy * 0.5 - 18, ox + dx, oy + dy - 34);
-    ctx.stroke();
-    ctx.strokeStyle = '#1b5e20';
-    ctx.lineWidth   = 1;
-    ctx.beginPath();
-    ctx.moveTo(ox + dx * 0.7, oy + dy * 0.7 - 26);
-    ctx.lineTo(ox + dx, oy + dy - 34);
-    ctx.stroke();
-  });
-}
-
-// ── Pixel cactus ─────────────────────────────────────────────────
-function drawCactus(x, y, h) {
+// ── Swaying pixel cacti (desert biome decoration) ────────────────
+function drawAnimCacti() {
+  const H = 36;
   const col = '#2d6a1e', dark = '#1a4011', tip = '#4caf50';
-  ctx.fillStyle = col;  ctx.fillRect(x - 4, y - h, 8, h);
-  ctx.fillStyle = dark; ctx.fillRect(x + 2, y - h + 5, 2, h - 5);
-  ctx.fillStyle = tip;  ctx.fillRect(x - 3, y - h, 6, 3);
-  if (h > 24) {
-    const ay = y - Math.round(h * 0.62);
+
+  ANIM_CACTI.forEach(({x, y}, idx) => {
+    const sway = Math.sin(Date.now() * 0.004 + idx) * 0.03;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(sway);
+
+    // trunk
+    ctx.fillStyle = col;  ctx.fillRect(-4, -H, 8, H);
+    ctx.fillStyle = dark; ctx.fillRect( 2, -H + 5, 2, H - 5);
+    ctx.fillStyle = tip;  ctx.fillRect(-3, -H, 6, 3);
+
+    // left arm
+    const ay1 = -Math.round(H * 0.62);
     ctx.fillStyle = col;
-    ctx.fillRect(x - 14, ay, 10, 5);
-    ctx.fillRect(x - 14, ay - 12, 5, 14);
-    ctx.fillStyle = dark; ctx.fillRect(x - 12, ay, 3, 5);
-    ctx.fillStyle = tip;  ctx.fillRect(x - 13, ay - 12, 4, 3);
-  }
-  if (h > 28) {
-    const ay = y - Math.round(h * 0.42);
+    ctx.fillRect(-14, ay1, 10, 5);
+    ctx.fillRect(-14, ay1 - 12, 5, 14);
+    ctx.fillStyle = dark; ctx.fillRect(-12, ay1, 3, 5);
+    ctx.fillStyle = tip;  ctx.fillRect(-13, ay1 - 12, 4, 3);
+
+    // right arm
+    const ay2 = -Math.round(H * 0.42);
     ctx.fillStyle = col;
-    ctx.fillRect(x + 4, ay, 10, 5);
-    ctx.fillRect(x + 9, ay - 16, 5, 18);
-    ctx.fillStyle = dark; ctx.fillRect(x + 6, ay, 3, 5);
-    ctx.fillStyle = tip;  ctx.fillRect(x + 8, ay - 16, 5, 3);
-  }
-}
+    ctx.fillRect(4, ay2, 10, 5);
+    ctx.fillRect(9, ay2 - 16, 5, 18);
+    ctx.fillStyle = dark; ctx.fillRect(6, ay2, 3, 5);
+    ctx.fillStyle = tip;  ctx.fillRect(8, ay2 - 16, 5, 3);
 
-// ── Jungle tree ───────────────────────────────────────────────────
-function jungleTree(x, y) {
-  ctx.fillStyle = '#4e2d10'; ctx.fillRect(x - 3, y, 6, 20);
-  ctx.fillStyle = '#3a2008'; ctx.fillRect(x + 1, y + 4, 2, 16);
-  [
-    {dx:  0, dy:  0, r:18, c:'#1b5e20'}, {dx: -9, dy: -8, r:13, c:'#2e7d32'},
-    {dx:  9, dy: -6, r:12, c:'#33691e'}, {dx:  0, dy:-18, r:14, c:'#388e3c'},
-    {dx: -5, dy:-26, r:10, c:'#43a047'}, {dx:  5, dy:-24, r: 9, c:'#4caf50'},
-  ].forEach(({dx, dy, r, c}) => {
-    ctx.fillStyle = c;
-    ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill();
-  });
-}
-
-// ── Cyber server tower ───────────────────────────────────────────
-function drawServerTower(x, y) {
-  const tw = 24, th = 44;
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.fillRect(x - tw/2 + 3, y + 3, tw, 4);
-  ctx.fillStyle = '#151a30';
-  ctx.fillRect(x - tw/2, y - th, tw, th);
-  ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1;
-  ctx.strokeRect(x - tw/2, y - th, tw, th);
-  ctx.strokeStyle = 'rgba(0,255,255,0.25)'; ctx.lineWidth = 0.5;
-  for (let d = 1; d < 4; d++) {
-    const dy = y - th + d * (th / 4);
-    ctx.beginPath(); ctx.moveTo(x - tw/2, dy); ctx.lineTo(x + tw/2, dy); ctx.stroke();
-  }
-  for (let row = 0; row < 4; row++) {
-    const ly    = y - th + 7 + row * 10;
-    const pulse = 0.5 + 0.5 * Math.abs(Math.sin(frame * 0.055 + row * 0.9));
-    ctx.globalAlpha = pulse;
-    ctx.fillStyle   = row % 2 === 0 ? '#00FFFF' : '#FF00FF';
-    ctx.fillRect(x - 8, ly, 5, 3);
-    ctx.fillRect(x + 3, ly, 5, 3);
-    ctx.globalAlpha = 1;
-  }
-  const pulseR = 4 + 2.5 * Math.abs(Math.sin(frame * 0.075));
-  ctx.save();
-  ctx.shadowColor = '#FF00FF'; ctx.shadowBlur = 14;
-  ctx.fillStyle   = '#FF00FF';
-  ctx.beginPath(); ctx.arc(x, y - th / 2, pulseR, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-  ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(x, y - th); ctx.lineTo(x, y - th - 12); ctx.stroke();
-  if (Math.abs(Math.sin(frame * 0.12)) > 0.5) {
-    ctx.fillStyle = '#FF0080';
-    ctx.beginPath(); ctx.arc(x, y - th - 12, 2.5, 0, Math.PI * 2); ctx.fill();
-  }
-}
-
-// ── Cloud ─────────────────────────────────────────────────────────
-function cloud({x, y, w}) {
-  ctx.fillStyle = 'rgba(255,255,255,0.70)';
-  [
-    {dx:0,     dy:0,      r:w*.28}, {dx:w*.22, dy:-w*.07, r:w*.20},
-    {dx:w*.44, dy:0,      r:w*.24}, {dx:w*.62, dy: w*.04, r:w*.16},
-  ].forEach(({dx, dy, r}) => {
-    ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   });
 }
 
@@ -915,95 +807,67 @@ function player() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  Creature updates & drawing
+//  Animation overlays
 // ══════════════════════════════════════════════════════════════════
-function updateScorpions() {
-  SCORPIONS.forEach(s => {
-    s.x += s.dir * 0.38;
-    if (Math.abs(s.x - s.baseX) > 22) s.dir *= -1;
-  });
-}
 
-function drawScorpion(x, y, dir) {
-  ctx.fillStyle = '#b8780a'; ctx.fillRect(x - 6, y - 5, 13, 8);
-  ctx.fillStyle = '#d4960e'; ctx.fillRect(x - 5, y - 4, 11, 3);
-  const hx = dir > 0 ? x + 6 : x - 10;
-  ctx.fillStyle = '#c88810'; ctx.fillRect(hx, y - 4, 5, 6);
-  ctx.fillStyle = '#ff2200'; ctx.fillRect(hx + (dir > 0 ? 3 : 0), y - 3, 1, 1);
-  const clx = dir > 0 ? hx + 5 : hx - 4;
-  ctx.fillStyle = '#b8780a'; ctx.fillRect(clx, y - 5, 4, 3); ctx.fillRect(clx, y, 4, 3);
-  ctx.fillStyle = '#e0a820';
-  ctx.fillRect(clx + (dir > 0 ? 2 : 0), y - 5, 2, 2);
-  ctx.fillRect(clx + (dir > 0 ? 2 : 0), y,     2, 2);
-  const td = dir > 0 ? -1 : 1;
-  ctx.fillStyle = '#965c08';
-  for (let k = 0; k < 5; k++) {
-    ctx.fillRect(Math.round(x + td*(k*4+5)), Math.round(y-4-k*2.5), 4, 4);
-  }
-  ctx.fillStyle = '#ff3300';
-  ctx.fillRect(Math.round(x + td*(5*4+5)) - 1, Math.round(y - 17), 3, 6);
-  ctx.strokeStyle = '#965c08'; ctx.lineWidth = 1;
-  for (let k = 0; k < 3; k++) {
-    const lx = x - 4 + k * 4;
-    ctx.beginPath(); ctx.moveTo(lx, y+2); ctx.lineTo(lx-4, y+8); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(lx, y+2); ctx.lineTo(lx+3, y+8); ctx.stroke();
-  }
-}
+// Glowing dashed wire pulse along the cyber road W10 → W11 → W12
+function drawCyberPulse() {
+  const w10 = NODES[nodeIdx('W10')];
+  const w11 = NODES[nodeIdx('W11')];
+  const w12 = NODES[nodeIdx('W12')];
 
-function updateSnakes() {
-  SNAKES.forEach(s => {
-    s.phase += 0.028;
-    s.x = s.baseX + Math.sin(s.phase * 0.65) * 22;
-  });
-}
-
-function drawSnake(x, y, phase) {
   ctx.save();
-  for (let k = 8; k >= 0; k--) {
-    const sx = x - k*5 + Math.sin(phase + k*0.88)*7;
-    const sy = y + Math.cos(phase*0.55 + k*0.55)*3.5;
-    const r  = k === 0 ? 5.5 : Math.max(1.8, 4.2 - k*0.35);
-    ctx.fillStyle = k === 0 ? '#c62828' : (k%3===0 ? '#f9a825' : (k%2===0 ? '#558b2f' : '#33691e'));
-    ctx.beginPath(); ctx.arc(Math.round(sx), Math.round(sy), r, 0, Math.PI*2); ctx.fill();
-  }
-  ctx.fillStyle = '#ffff00';
-  ctx.fillRect(Math.round(x)+3, Math.round(y)-3, 2, 2);
-  ctx.fillRect(Math.round(x)+3, Math.round(y)+1, 2, 2);
-  ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0, 243, 255, 0.8)';
+  ctx.lineWidth   = 3;
+  ctx.shadowBlur  = 8;
+  ctx.shadowColor = '#00f3ff';
+  ctx.setLineDash([4, 16]);
+  ctx.lineDashOffset = -(performance.now() / 30) % 20;
+
   ctx.beginPath();
-  ctx.moveTo(Math.round(x)+8, Math.round(y)); ctx.lineTo(Math.round(x)+12, Math.round(y)-2);
-  ctx.moveTo(Math.round(x)+8, Math.round(y)); ctx.lineTo(Math.round(x)+12, Math.round(y)+2);
+  ctx.moveTo(w10.x, w10.y);
+  ctx.lineTo(w11.x, w11.y);
+  ctx.lineTo(w12.x, w12.y);
   ctx.stroke();
+
   ctx.restore();
 }
 
-function getBezierPoint(p1, p2, cp, t) {
-  return {
-    x: (1-t)*(1-t)*p1.x + 2*(1-t)*t*cp.x + t*t*p2.x,
-    y: (1-t)*(1-t)*p1.y + 2*(1-t)*t*cp.y + t*t*p2.y,
-  };
-}
+// Advance all particle positions; loop within their biome bounds
+function updateParticles() {
+  PARTICLES.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.phase += 0.04;
 
-function updateDataPackets() {
-  DATA_PACKETS.forEach(p => {
-    p.t += p.speed;
-    if (p.t > 1) p.t -= 1;
+    if (p.type === 'firefly') {
+      if (p.x < FIREFLY_BOUNDS.minX || p.x > FIREFLY_BOUNDS.maxX) p.vx *= -1;
+      if (p.y < FIREFLY_BOUNDS.minY || p.y > FIREFLY_BOUNDS.maxY) p.vy *= -1;
+    } else {
+      // dust drifts left; wrap around to the right edge when off-screen
+      if (p.x < DUST_BOUNDS.minX) p.x = DUST_BOUNDS.maxX;
+      if (p.x > DUST_BOUNDS.maxX) p.x = DUST_BOUNDS.minX;
+      if (p.y < DUST_BOUNDS.minY || p.y > DUST_BOUNDS.maxY) p.vy *= -1;
+    }
   });
 }
 
-function drawDataPackets() {
-  DATA_PACKETS.forEach(p => {
-    if (p.seg >= MAIN_PATH_LEN - 1) return;
-    const cp  = getControlPoint(p.seg);
-    const pos = getBezierPoint(NODES[p.seg], NODES[p.seg + 1], cp, p.t);
-    ctx.save();
-    ctx.shadowColor = '#00FFFF'; ctx.shadowBlur = 12;
-    ctx.fillStyle   = '#00FFFF';
-    ctx.fillRect(Math.round(pos.x) - 4, Math.round(pos.y) - 4, 8, 8);
-    ctx.shadowBlur = 0; ctx.fillStyle = '#ffffff';
-    ctx.fillRect(Math.round(pos.x) - 2, Math.round(pos.y) - 2, 4, 4);
-    ctx.restore();
+// Draw fireflies (yellow-green blinking 2×2 dots) and dust (tan 3×1 dashes)
+function drawParticles() {
+  PARTICLES.forEach(p => {
+    if (p.type === 'firefly') {
+      const alpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(p.phase));
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle   = '#aaff44';
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2);
+    } else {
+      const alpha = 0.25 + 0.25 * (0.5 + 0.5 * Math.sin(p.phase));
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle   = '#c8a86a';
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), 3, 1);
+    }
   });
+  ctx.globalAlpha = 1;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1012,13 +876,18 @@ function drawDataPackets() {
 function tick() {
   frame++;
 
+  updateParticles();
+
   // Background image is rendered by CSS — clear canvas to transparent
   // so the image shows through, then draw only the interactive layer.
   ctx.clearRect(0, 0, CW, CH);
 
-  paths();
-  nodes();
-  player();
+  drawAnimCacti();     // desert biome: swaying pixel cacti
+  paths();             // road network
+  drawCyberPulse();    // cyber biome: animated wire pulses over roads
+  drawParticles();     // jungle fireflies + desert dust motes
+  nodes();             // course node buttons
+  player();            // player avatar
 
   requestAnimationFrame(tick);
 }
