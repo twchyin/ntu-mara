@@ -651,7 +651,7 @@ function nodes() {
     const {x, y}   = node;
     const w        = weekData(i);
     const locked   = !guestMode && w.admin_step === 0;
-    const completed= w.user_score != null && w.user_score > 0;
+    const completed= guestMode || (w.user_score != null && w.user_score > 0);
     const isCur    = i === cur;
     const zone     = nodeZone(i);
     const isQuiz   = node.type === 'quiz';
@@ -664,8 +664,8 @@ function nodes() {
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    // Pulsing aura — only for unlocked, not-yet-completed nodes; suppressed in Guest Mode
-    if (!locked && !completed && !guestMode) {
+    // Pulsing aura — only for unlocked, not-yet-completed nodes
+    if (!locked && !completed) {
       const phase     = Math.abs(Math.sin(frame * 0.038 + i * 0.55));
       const auraR     = NR + 5 + phase * 9;
       const auraAlpha = 0.12 + phase * 0.28;
@@ -750,8 +750,8 @@ function nodes() {
       borderColor = '#0e3a0e';
     }
 
-    if ((zone === 'cyber' || isQuiz) && !locked && !completed && !guestMode) {
-      // Glow border only on active (incomplete) cyber/quiz nodes; suppressed in Guest Mode
+    if ((zone === 'cyber' || isQuiz) && !locked && !completed) {
+      // Glow border only on active (incomplete) cyber/quiz nodes
       ctx.save();
       ctx.shadowColor = borderColor; ctx.shadowBlur = 14;
       ctx.strokeStyle = borderColor; ctx.lineWidth  = 3;
