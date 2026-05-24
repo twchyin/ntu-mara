@@ -250,7 +250,7 @@
 <!-- Game -->
 <div id="game-wrap" style="display:none">
   <canvas id="c" width="1000" height="600"></canvas>
-  <div id="key-hints">← → MOVE MAIN PATH &nbsp;|&nbsp; ↓ W4 QUIZ &nbsp;|&nbsp; ↑ W7 QUIZ &nbsp;|&nbsp; ENTER INSPECT &nbsp;|&nbsp; CLICK NODE</div>
+  <div id="key-hints">← → MOVE MAIN PATH &nbsp;|&nbsp; ↓ W4 QUIZ &nbsp;|&nbsp; ↓ W7 QUIZ &nbsp;|&nbsp; ENTER INSPECT &nbsp;|&nbsp; CLICK NODE</div>
 </div>
 
 <!-- Modal -->
@@ -282,25 +282,25 @@ const MAIN_PATH_LEN = 12;   // indices 0–11 on the main trail
 
 // ── Node layout — 12 main path + 2 quiz side-branches ────────────
 const NODES = [
-  {x:100,  y:500},                               // 0  W1   desert start
-  {x:220,  y:480},                               // 1  W2   desert
-  {x:340,  y:510},                               // 2  W3   desert
-  {x:460,  y:470},                               // 3  W4   desert (branch origin ↓)
-  {x:580,  y:360},                               // 4  W5   jungle entry
-  {x:460,  y:300},                               // 5  W6   jungle
-  {x:340,  y:260},                               // 6  W7   jungle (branch origin ↑)
-  {x:220,  y:220},                               // 7  W8   jungle
-  {x:410,  y:130},                               // 8  W9   jungle endpoint
-  {x:520,  y:120},                               // 9  W10  cyber entry
-  {x:700,  y:100},                               // 10 W11  cyber
-  {x:880,  y: 90},                               // 11 W12  cyber peak
-  {x:460,  y:560, isBranch:true, branchFrom:3},  // 12 W4 Quiz (↓ from W4)
-  {x:340,  y:160, isBranch:true, branchFrom:6},  // 13 W7 Quiz (↑ from W7)
+  {x:100,  y:480},                               // 0  W1   desert start
+  {x:280,  y:480},                               // 1  W2   desert
+  {x:460,  y:480},                               // 2  W3   desert
+  {x:640,  y:480},                               // 3  W4   desert (branch origin ↓)
+  {x:740,  y:380},                               // 4  W5   jungle entry
+  {x:740,  y:280},                               // 5  W6   jungle
+  {x:580,  y:280},                               // 6  W7   jungle (branch origin ↓)
+  {x:420,  y:280},                               // 7  W8   jungle
+  {x:240,  y:280},                               // 8  W9   jungle
+  {x:240,  y:120},                               // 9  W10  cyber entry
+  {x:550,  y:120},                               // 10 W11  cyber
+  {x:880,  y:120},                               // 11 W12  cyber peak
+  {x:640,  y:550, isBranch:true, branchFrom:3},  // 12 W4 Quiz (↓ from W4)
+  {x:580,  y:350, isBranch:true, branchFrom:6},  // 13 W7 Quiz (↓ from W7)
 ];
 
-// Nodes whose quiz branch is navigable via ↓ / ↑
-const BRANCH_DOWN = { 3: 12 };   // W4 → W4 Quiz
-const BRANCH_UP   = { 6: 13 };   // W7 → W7 Quiz
+// Nodes whose quiz branch is navigable via ↓
+const BRANCH_DOWN = { 3: 12, 6: 13 };  // W4 → W4 Quiz, W7 → W7 Quiz
+const BRANCH_UP   = {};                  // no upward branches
 
 // ── Zone helper ───────────────────────────────────────────────────
 function nodeZone(i) {
@@ -322,37 +322,39 @@ function isUnlocked(i) {
 
 // ── Desert cacti ──────────────────────────────────────────────────
 const CACTI = [
-  {x:  62, y: 565, h: 42},
-  {x: 178, y: 558, h: 30},
-  {x: 335, y: 572, h: 26},
-  {x: 462, y: 568, h: 38},
-  {x: 638, y: 556, h: 28},
-  {x: 748, y: 562, h: 34},
-  {x: 842, y: 570, h: 30},
-  {x: 952, y: 560, h: 36},
+  {x:  48, y: 548, h: 42},
+  {x: 162, y: 555, h: 30},
+  {x: 315, y: 545, h: 26},
+  {x: 455, y: 558, h: 38},
+  {x: 570, y: 548, h: 28},
+  {x: 660, y: 552, h: 34},
+  {x: 200, y: 565, h: 22},
+  {x: 510, y: 562, h: 30},
 ];
 
 // ── Jungle trees ──────────────────────────────────────────────────
 const JUNGLE_TREES = [
-  {x: 30,  y:225}, {x: 55,  y:255}, {x: 32,  y:295},
-  {x: 24,  y:345}, {x: 48,  y:375},
-  {x:756,  y:210}, {x:779,  y:240}, {x:762,  y:270},
-  {x:770,  y:332},
-  {x:162,  y:355}, {x:186,  y:378},
-  {x:458,  y:240}, {x:482,  y:265},
-  {x:598,  y:335},
-  {x:288,  y:395},
-  {x:640,  y:252},
-  {x:372,  y:210},
-  {x:205,  y:195}, {x:550,  y:192},
+  // Right flank near W5 (740,380) and W6 (740,280)
+  {x:768,  y:348}, {x:792,  y:385}, {x:778,  y:418},
+  {x:805,  y:295}, {x:825,  y:328},
+  // Middle jungle band near path y=248-315
+  {x:158,  y:258}, {x:188,  y:298},
+  {x:308,  y:252}, {x:338,  y:295},
+  {x:482,  y:258}, {x:508,  y:296},
+  {x:642,  y:258}, {x:668,  y:296},
+  // Above jungle path
+  {x:252,  y:248}, {x:452,  y:250},
+  {x:602,  y:252},
+  // Left boundary near W9 (240,280)
+  {x:198,  y:312}, {x:212,  y:348},
 ];
 
 // ── Cyber server towers ───────────────────────────────────────────
 const SERVER_TOWERS = [
-  {x:  78, y: 168},
-  {x: 432, y: 163},
-  {x: 762, y: 155},
-  {x: 942, y: 145},
+  {x: 172, y: 145},
+  {x: 398, y: 140},
+  {x: 682, y: 138},
+  {x: 948, y: 145},
 ];
 
 // ── Drifting clouds ───────────────────────────────────────────────
@@ -367,15 +369,15 @@ const CLOUDS = [
 
 // ── Scorpions (desert) ────────────────────────────────────────────
 const SCORPIONS = [
-  {x: 170, y: 550, dir:  1, baseX: 170},
-  {x: 524, y: 553, dir: -1, baseX: 524},
+  {x: 238, y: 545, dir:  1, baseX: 238},
+  {x: 552, y: 548, dir: -1, baseX: 552},
 ];
 
 // ── Snakes (jungle) ───────────────────────────────────────────────
 const SNAKES = [
-  {x: 578, y: 342, phase: 0.0, baseX: 578},
-  {x: 418, y: 328, phase: 1.5, baseX: 418},
-  {x: 136, y: 222, phase: 3.0, baseX: 136},
+  {x: 762, y: 398, phase: 0.0, baseX: 762},
+  {x: 488, y: 302, phase: 1.5, baseX: 488},
+  {x: 288, y: 300, phase: 3.0, baseX: 288},
 ];
 
 // ── Cyan data packets along cyber segments ────────────────────────
@@ -428,12 +430,12 @@ function drawBackground() {
   ctx.fillStyle = jg;
   ctx.fillRect(0, 0, CW, CH);
 
-  const dg = ctx.createLinearGradient(0, 320, 0, CH);
+  const dg = ctx.createLinearGradient(0, 370, 0, CH);
   dg.addColorStop(0,    'rgba(200,148,65,0)');
   dg.addColorStop(0.22, 'rgba(218,175,110,0.82)');
   dg.addColorStop(1,    'rgba(238,217,144,1)');
   ctx.fillStyle = dg;
-  ctx.fillRect(0, 320, CW, CH - 320);
+  ctx.fillRect(0, 370, CW, CH - 370);
 
   const cg = ctx.createLinearGradient(0, 0, 0, 220);
   cg.addColorStop(0,    'rgba(10,13,30,1)');
@@ -482,7 +484,7 @@ function drawSandDunes() {
 
 // ── Oasis near W2 ────────────────────────────────────────────────
 function drawOasis() {
-  const ox = 252, oy = 546;
+  const ox = 275, oy = 535;
   ctx.save();
   ctx.globalAlpha = 0.72;
   const wg = ctx.createRadialGradient(ox, oy, 2, ox, oy, 30);
@@ -707,7 +709,7 @@ function paths() {
   }
   // Side branches
   drawBranchSegment(3,  12);  // W4 → W4 Quiz (↓)
-  drawBranchSegment(6,  13);  // W7 → W7 Quiz (↑)
+  drawBranchSegment(6,  13);  // W7 → W7 Quiz (↓)
   ctx.setLineDash([]);
   ctx.restore();
 }
@@ -1042,15 +1044,17 @@ document.addEventListener('keydown', e => {
     else if (cur > 0)  { cur--; }
     e.preventDefault();
   } else if (e.key === 'ArrowDown') {
-    // Enter downward branch (W4 → W4 Quiz), or exit an upward branch back to parent (Q7 → W7)
-    if (BRANCH_DOWN[cur] !== undefined)  { cur = BRANCH_DOWN[cur]; e.preventDefault(); }
+    // Enter downward branch (W4/W7 → Quiz), W5 → W4 shortcut, or exit branch back to parent
+    if (BRANCH_DOWN[cur] !== undefined) { cur = BRANCH_DOWN[cur]; e.preventDefault(); }
+    else if (cur === 4) { cur = 3; e.preventDefault(); }  // W5 → W4 gateway shortcut
     else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y > node.y) {
       // Parent is below this branch node → DOWN navigates back toward parent
       cur = node.branchFrom; e.preventDefault();
     }
   } else if (e.key === 'ArrowUp') {
-    // Enter upward branch (W7 → W7 Quiz), or exit a downward branch back to parent (W4 Quiz → W4)
-    if (BRANCH_UP[cur] !== undefined)    { cur = BRANCH_UP[cur];   e.preventDefault(); }
+    // W4 → W5 shortcut, exit downward branch back to parent (Quiz → parent)
+    if (cur === 3) { cur = 4; e.preventDefault(); }  // W4 → W5 gateway shortcut
+    else if (BRANCH_UP[cur] !== undefined) { cur = BRANCH_UP[cur]; e.preventDefault(); }
     else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y < node.y) {
       // Parent is above this branch node → UP navigates back toward parent
       cur = node.branchFrom; e.preventDefault();
