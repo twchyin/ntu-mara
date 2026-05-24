@@ -675,65 +675,25 @@ function nodes() {
       ctx.restore();
     }
 
-    // Fill
+    // Fill — flat solid colors, no radial gradients
     ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2);
-    if (locked) {
-      const sg = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      if (zone === 'desert') { sg.addColorStop(0,'#8a7050'); sg.addColorStop(1,'#4a3020'); }
-      else if (zone === 'cyber') { sg.addColorStop(0,'#1a2045'); sg.addColorStop(1,'#0c1030'); }
-      else { sg.addColorStop(0,'#3a4a30'); sg.addColorStop(1,'#1a2810'); }
-      ctx.fillStyle = sg;
-    } else if (completed) {
-      // Flat retro "level clear" blue — no radial gradient, no glow
-      ctx.fillStyle = '#4a75a0';
+    if (completed) {
+      ctx.fillStyle = '#4a75a0';  // uniform retro slate-blue for every cleared node
+    } else if (locked) {
+      ctx.fillStyle = '#404040';  // uniform dark grey for every locked node
     } else if (isQuiz) {
-      const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      g.addColorStop(0,'#FFF0A0'); g.addColorStop(0.6,'#d49020'); g.addColorStop(1,'#5a3000');
-      ctx.fillStyle = g;
+      ctx.fillStyle = '#d49020';  // gold-amber for active quiz branch
     } else if (zone === 'cyber') {
-      const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      g.addColorStop(0,'#88FFFF'); g.addColorStop(0.6,'#008888'); g.addColorStop(1,'#002222');
-      ctx.fillStyle = g;
+      ctx.fillStyle = '#008888';  // teal for active cyber nodes
     } else if (zone === 'desert') {
-      const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      g.addColorStop(0,'#e8c060'); g.addColorStop(1,'#8a5c18');
-      ctx.fillStyle = g;
+      ctx.fillStyle = '#c09020';  // sand-gold for active desert nodes
     } else {
-      const g = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, NR);
-      g.addColorStop(0,'#82E082'); g.addColorStop(1,'#165016');
-      ctx.fillStyle = g;
+      ctx.fillStyle = '#2a7a2a';  // forest green for active jungle nodes
     }
     ctx.fill();
 
-    // Cyber scan-line — only on unlocked, incomplete cyber nodes
-    if (zone === 'cyber' && !locked && !completed) {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.clip();
-      ctx.globalAlpha = 0.28;
-      ctx.fillStyle   = '#00FFFF';
-      const scanY = y - NR + ((frame * 2.2) % (NR * 2));
-      ctx.fillRect(x - NR, scanY - 1, NR * 2, 1.5);
-      ctx.fillRect(x - NR, scanY - NR - 1, NR * 2, 1.5);
-      ctx.restore();
-    }
-
-    // Border
-    let borderColor;
-    if (locked) {
-      borderColor = zone === 'cyber' ? '#223' : '#444';
-    } else if (completed) {
-      borderColor = '#000';  // sharp black border on cleared nodes — no glow
-    } else if (isQuiz) {
-      borderColor = '#d4a020';
-    } else if (zone === 'cyber') {
-      borderColor = '#00FFFF';
-    } else if (zone === 'desert') {
-      borderColor = '#c09020';
-    } else {
-      borderColor = '#0e3a0e';
-    }
-
-    // Universal crisp 16-bit border — no shadow blur on any node
+    // Border — uniform black outline for completed/active; dark tint for locked
+    const borderColor = locked ? '#1a1a1a' : '#000000';
     ctx.strokeStyle = borderColor;
     ctx.lineWidth   = 2;
     ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.stroke();
