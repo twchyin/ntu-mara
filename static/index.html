@@ -361,14 +361,14 @@ function weekData(i) {
 
   // Primary: label-based search (robust against interspersed quiz rows in sheets)
   if (isQuiz) {
-    // Quiz nodes prefer a quiz-labelled row for this week number
+    // Quiz nodes match rows labelled exactly "Week N Quiz" (any capitalisation/spacing)
     const quizRow = weeks.find(w => {
       const lbl = (w.week || '').trim().toLowerCase();
-      return lbl.startsWith(target) && /quiz/i.test(lbl);
+      return (lbl === target + ' quiz' || lbl.startsWith(target + ' ') && /quiz/i.test(lbl));
     });
     if (quizRow) return quizRow;
   }
-  // Regular week (or quiz fallback): find the non-quiz entry for this week number
+  // Regular week (or quiz fallback): match exact "Week N" or "Week N <non-quiz suffix>"
   const weekRow = weeks.find(w => {
     const lbl = (w.week || '').trim().toLowerCase();
     return lbl === target || (lbl.startsWith(target + ' ') && !/quiz/i.test(lbl));
