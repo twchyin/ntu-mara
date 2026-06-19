@@ -107,7 +107,14 @@ async def login(request: Request):
         f"&state={state}"
     )
     resp = RedirectResponse(url=url)
-    resp.set_cookie("oauth_state", state, httponly=True, samesite="lax", max_age=600)
+    resp.set_cookie(
+        "oauth_state",
+        state,
+        httponly=True,
+        samesite="none",
+        secure=True,
+        max_age=600,
+    )
     return resp
 
 
