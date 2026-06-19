@@ -5,3 +5,7 @@ google-auth>=2.23.0
 httpx>=0.25.0
 itsdangerous>=2.1.2
 python-multipart>=0.0.6
+
+# Dev / test dependencies
+pytest>=7.0
+pytest-asyncio>=0.21

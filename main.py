@@ -124,7 +124,7 @@ async def callback(
         raise HTTPException(400, "Missing authorization code")
 
     stored = request.cookies.get("oauth_state")
-    if state and stored and state != stored:
+    if not state or not stored or state != stored:
         raise HTTPException(400, "OAuth state mismatch")
 
     async with httpx.AsyncClient() as client:
