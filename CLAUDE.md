@@ -4,46 +4,88 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a single-file static HTML application — an interactive "World Map" learning journey visualizer for a 13-week database and programming course (NTU MARA). There is no build system, no package manager, and no test framework. The entire application lives in `index.html`.
+NTU MARA Quest is an interactive course-progress visualizer for a 13-week database and programming course. It consists of:
+
+- **`main.py`** — FastAPI backend: HuggingFace OAuth login, Google Sheets score fetching, session cookies
+- **`static/index.html`** — the served frontend: a `<canvas>`-based animated quest map with per-node progress modals
+- **`assets/`** — static images and SVGs served at `/assets/*`
+
+> **Note:** The root-level `index.html` is an orphaned prototype (Tailwind/VT323 pan-zoom DOM app) that is NOT served by the backend. Do not edit it — edit `static/index.html`.
 
 ## Running the Project
 
-Open `index.html` directly in a browser — no server required. For local development with live reload, any static file server works:
+The backend must be running for OAuth and score data to work:
 
 ```bash
-python3 -m http.server 8080
-# or
-npx serve .
+pip install -r requirements.txt
+uvicorn main:app --reload --port 7860
+# then open http://localhost:7860
 ```
+
+Environment variables needed for full functionality (optional for local dev):
+
+| Variable | Purpose |
+|---|---|
+| `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` | HuggingFace OAuth |
+| `APP_SECRET_KEY` | Stable secret for signing session cookies |
+| `GOOGLE_SHEET_ID` | Google Sheet containing student scores |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Service-account credentials JSON (stringified) |
+| `GOOGLE_SHEET_TAB` | Sheet tab name (default: `Sheet1`) |
+
+Without OAuth configured, `/api/syllabus-data` works without auth. Without Sheets configured, the app falls back to `MOCK_WEEKS`.
 
 ## Architecture
 
-Everything is contained in `index.html` as one self-contained document:
+### Backend (`main.py`)
 
-- **Styles** — inline `<style>` block using Tailwind CSS (CDN), custom CSS for the pixel-art game aesthetic (`.map-node`, `.wave`, `.modal-overlay`, `.mc-button`), and keyframe animations (`drift`, `dashMove`, `spin`)
-- **HTML structure** — a fixed `<header>` UI panel, a `#viewport` div containing the pannable/zoomable `#world-map` div, zoom controls, and a `#modal` overlay
-- **JavaScript** — all logic inline in a `<script>` block at the bottom; no modules, no bundler
+- **OAuth flow** — `/login` → HuggingFace → `/callback` → signed `hf_session` cookie via `itsdangerous.URLSafeSerializer`
+- **`_current_user(request)`** — reads `X-HF-Username`/`X-HF-User-Id`/`X-HF-User` headers (HF Space injection) or the `hf_session` cookie
+- **`/api/syllabus-data`** — fetches the Google Sheet, finds the user's score column by HF username, returns per-week scores; falls back to `MOCK_WEEKS` on any Sheets error
+- **`/api/guest-data`** — public endpoint returning `MOCK_WEEKS` with no scores
+- **`MOCK_WEEKS`** — 14-entry list used as fallback and for guest mode
 
-### Key JS concepts
+### Frontend (`static/index.html`)
 
-**`nodes` array** — the single source of truth for all course content. Each node has `id`, `label` (e.g. "L1"), `x`/`y` pixel coordinates within the 1536×864 map canvas, `week`, `about`, `stars` (array of 3 mastery objectives), and an optional `style: "danger"` for boss nodes rendered with a skull icon.
-
-**Pan/zoom system** — `posX`, `posY`, `scale` state variables; `updateTransform()` applies `translate(${posX}px, ${posY}px) scale(${scale})` to `#world-map`. Mouse drag, scroll wheel, and button controls all mutate these variables. `resetView()` auto-fits the 1536×864 canvas to the viewport with padding.
-
-**`renderNodes()`** — iterates the `nodes` array and creates `.map-node` `<button>` elements positioned absolutely within `#world-map`. Nodes stagger in with a 50ms `setTimeout` delay between each.
-
-**`drawPaths()`** — creates quadratic Bézier SVG `<path>` elements between consecutive nodes (node[i] → node[i+1]) with a random control point offset for an organic look. Rendered into the `#paths` SVG element.
-
-**`openMap(id)`** — finds the node by ID, builds the modal HTML string, and sets `modal.style.display = 'flex'`.
-
-### Assets
-
-`assets/world-map.png` — the background map image (1536×864px). The `assets/islands/` directory contains SVG files for individual island regions, though these are not currently referenced in `index.html`.
+- **`NODES` array** — source of truth for all 14 course nodes; each has `id`, zone, canvas `x`/`y`, and week label
+- **Canvas render loop** — `tick()` calls `nodes()` + `drawPaths()` every frame; pan/zoom state in `camX`/`camY`/`zoom`
+- **`weekData(i)`** — maps node index → sheet row; called per node per frame (optimization opportunity: memoize)
+- **`openModal(id)`** — builds and displays the per-node progress modal
 
 ## Making Changes
 
-**Adding or editing a lesson node** — modify the `nodes` array in the `<script>` block. The `x`/`y` coordinates are pixel positions within the 1536×864 map canvas.
+**Adding a course node** — add an entry to `NODES` in `static/index.html` with `id`, `zone`, `x`/`y` canvas coordinates, and `week` label.
 
-**Styling** — the pixel/game aesthetic relies on `VT323` (pixel font via Google Fonts) and custom CSS classes. The color palette is warm amber (`#ffdd8c`, `#c16a00`) for normal nodes and red (`#ffb39c`, `#9f1b10`) for danger/boss nodes.
+**Editing week content** — update `MOCK_WEEKS` in `main.py` (used for guest mode and fallback); the authoritative content lives in the Google Sheet.
 
-**Layout** — `#world-map` is fixed at 1536×864px and CSS-transformed for pan/zoom; UI controls use `position: fixed` with `z-index: 100` to stay above the map.
+**Styling** — the aesthetic uses Press Start 2P (Google Fonts) and NES.css for pixel-art UI. Zone palettes are hard-coded in `drawMainSegment`/`drawBranchSegment`.
+
+## Testing
+
+**Run all tests before and after every code change:**
+
+```bash
+python -m pytest tests/ -v
+```
+
+All 49 tests must pass. Never push code that breaks the test suite.
+
+### Test structure
+
+| File | Coverage |
+|---|---|
+| `tests/test_unit.py` | Pure helpers: `col()`, `cell()`, `safe_int()`, `_current_user()`, `MOCK_WEEKS` shape |
+| `tests/test_integration.py` | HTTP routes: `/`, `/api/guest-data`, `/api/syllabus-data`, `/login`, `/logout`, `/callback` CSRF |
+
+### Writing new tests
+
+- Add unit tests for any new pure-Python helper added to `main.py`
+- Add integration tests for any new route or changed response shape
+- Use `unittest.mock.patch("main.<symbol>")` to mock env vars and `_worksheet()`
+- Tests must not make real network calls (Google Sheets, HuggingFace)
+- A zero user score (`user_score=0`) must remain distinguishable from `None` — the `test_zero_user_score_preserved` test guards this
+
+### Installing test dependencies
+
+```bash
+pip install pytest pytest-asyncio
+```
