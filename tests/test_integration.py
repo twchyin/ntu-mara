@@ -188,6 +188,15 @@ class TestLogin:
             r = client.get("/login", follow_redirects=False)
         assert "oauth_state" in r.cookies
 
+    def test_oauth_state_cookie_works_in_iframe(self):
+        """HF Spaces serves the app in an iframe — the state cookie must be
+        SameSite=None; Secure or browsers drop it and every callback 400s."""
+        with patch("main.OAUTH_CLIENT_ID", "my-client-id"):
+            r = client.get("/login", follow_redirects=False)
+        set_cookie = r.headers.get("set-cookie", "").lower()
+        assert "samesite=none" in set_cookie
+        assert "secure" in set_cookie
+
     def test_returns_501_when_no_client_id(self):
         with patch("main.OAUTH_CLIENT_ID", ""):
             r = client.get("/login")
