@@ -1164,7 +1164,15 @@ async function startGuestMode() {
     weeks = [];
   }
   document.getElementById('hud-user').textContent  = '👤 GUEST';
-  document.getElementById('hud-score').textContent = '0 / 100 PTS';
+  // Same score aggregation as init(): sheet max_points sum to 100; with no
+  // GUEST score column all user_scores are null, rendering "0 / 100 PTS".
+  let tot = 0, max = 0;
+  NODES.forEach((node, i) => {
+    const w = weekData(i);
+    tot += (w.user_score  || 0);
+    max += (w.max_points  || 0);
+  });
+  document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
   document.getElementById('logout-btn').style.display = 'inline-block';
   document.getElementById('screen-login').style.display = 'none';
   document.getElementById('game-wrap').style.display    = 'block';
