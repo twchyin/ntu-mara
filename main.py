@@ -184,7 +184,9 @@ async def callback(
 @app.get("/logout")
 async def logout():
     resp = RedirectResponse("/")
-    resp.delete_cookie("hf_session")
+    # Attributes must match how the cookie was set in /callback
+    # (samesite="none", secure=True) or some browsers refuse the deletion.
+    resp.delete_cookie("hf_session", samesite="none", secure=True)
     return resp
 
 
