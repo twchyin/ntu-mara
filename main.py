@@ -188,37 +188,26 @@ async def logout():
     return resp
 
 
-# ── API ──────────────────────────────────────────────────────────
+# ── Sheet fetch + row parsing (shared by auth and guest endpoints) ─
 
-@app.get("/api/syllabus-data")
-async def syllabus_data(request: Request):
-    username = _current_user(request)
-
-    # Require auth unless OAuth is not configured (local dev).
-    if not username and OAUTH_CLIENT_ID:
-        raise HTTPException(401, "Not authenticated")
-
-    # ── Fetch rows from Google Sheets ────────────────────────────
-    rows: list = []
-    sheet_error: str = ""
+def _fetch_sheet_rows():
+    """Return (rows, error). rows is [] when the sheet is unreachable."""
     try:
         ws = _worksheet()
         rows = ws.get_all_values()
+        return rows, ""
     except Exception as exc:
         print(f"ERROR: Failed to fetch from Google Sheets API: {exc}", flush=True)
-        sheet_error = str(exc)
+        return [], str(exc)
 
-    # ── Graceful fallback to mock data when Sheets is unavailable ─
-    if sheet_error or not rows:
-        mock = [dict(w) for w in MOCK_WEEKS]   # shallow copy so originals stay clean
-        return JSONResponse({
-            "username": username or "dev",
-            "weeks": mock,
-            "user_col_found": False,
-            "fallback": True,
-            "fallback_reason": sheet_error or "Sheet returned no data",
-        })
 
+def _parse_weeks(rows: list, score_identities: list) -> tuple:
+    """Parse sheet rows into week dicts.
+
+    score_identities is a priority-ordered list of column-header names to
+    try for the per-user score column (e.g. [username] for a student,
+    ["GUEST", "default"] for guest mode). Returns (weeks_out, user_col_found).
+    """
     headers = rows[0]
 
     def col(name: str) -> Optional[int]:
@@ -233,13 +222,14 @@ async def syllabus_data(request: Request):
     max_i   = col("Max Points")          if col("Max Points")          is not None else 3
     admin_i = col("Admin Step")          if col("Admin Step")          is not None else 4
 
-    # Find the student's score column (case-insensitive match on HF username).
+    # Score column: first identity that matches a header wins.
     user_col: Optional[int] = None
-    if username:
-        for i, h in enumerate(headers):
-            if h.strip().lower() == username.strip().lower():
-                user_col = i
-                break
+    for ident in score_identities:
+        if not ident:
+            continue
+        user_col = col(ident)
+        if user_col is not None:
+            break
 
     def cell(row: list, idx: Optional[int], default: str = "") -> str:
         if idx is None or idx >= len(row):
@@ -257,7 +247,7 @@ async def syllabus_data(request: Request):
         if not any(c.strip() for c in row):
             continue
 
-        max_pts   = safe_int(cell(row, max_i,   "0")) or 0
+        max_pts    = safe_int(cell(row, max_i,   "0")) or 0
         admin_step = safe_int(cell(row, admin_i, "0")) or 0
         user_score = safe_int(cell(row, user_col)) if user_col is not None else None
 
@@ -270,22 +260,67 @@ async def syllabus_data(request: Request):
             "user_score": user_score,
         })
 
+    return weeks_out, user_col is not None
+
+
+def _mock_fallback(username: str, reason: str, guest: bool = False):
+    mock = [dict(w) for w in MOCK_WEEKS]   # shallow copy so originals stay clean
+    payload = {
+        "username": username,
+        "weeks": mock,
+        "user_col_found": False,
+        "fallback": True,
+        "fallback_reason": reason or "Sheet returned no data",
+    }
+    if guest:
+        payload["guest"] = True
+    return JSONResponse(payload)
+
+
+# ── API ──────────────────────────────────────────────────────────
+
+@app.get("/api/syllabus-data")
+async def syllabus_data(request: Request):
+    username = _current_user(request)
+
+    # Require auth unless OAuth is not configured (local dev).
+    if not username and OAUTH_CLIENT_ID:
+        raise HTTPException(401, "Not authenticated")
+
+    rows, sheet_error = _fetch_sheet_rows()
+    if sheet_error or not rows:
+        return _mock_fallback(username or "dev", sheet_error)
+
+    weeks_out, user_col_found = _parse_weeks(rows, [username])
+
     return JSONResponse({
         "username":      username or "dev",
         "weeks":         weeks_out,
-        "user_col_found": user_col is not None,
+        "user_col_found": user_col_found,
     })
 
 
 @app.get("/api/guest-data")
 async def guest_data():
-    """Public endpoint — returns mock course structure with no personal scores."""
-    mock = [dict(w) for w in MOCK_WEEKS]
+    """Public endpoint — live sheet content, guest score column.
+
+    Uses the exact same fetch and row-parsing logic as the authenticated
+    endpoint, but resolves scores from a dedicated "GUEST" (or "default")
+    column header instead of a personal username column. If no such column
+    exists, all user_score values are null and the map renders scoreless.
+    MOCK_WEEKS is only used when the sheet itself is unreachable.
+    """
+    rows, sheet_error = _fetch_sheet_rows()
+    if sheet_error or not rows:
+        return _mock_fallback("Guest", sheet_error, guest=True)
+
+    weeks_out, user_col_found = _parse_weeks(rows, ["GUEST", "default"])
+
     return JSONResponse({
-        "username": "Guest",
-        "weeks": mock,
-        "user_col_found": False,
-        "guest": True,
+        "username":      "Guest",
+        "weeks":         weeks_out,
+        "user_col_found": user_col_found,
+        "guest":         True,
     })
 
 
