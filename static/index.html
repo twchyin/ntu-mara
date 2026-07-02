@@ -1120,21 +1120,27 @@ function escHtml(s) {
 // ══════════════════════════════════════════════════════════════════
 //  Logout
 // ══════════════════════════════════════════════════════════════════
-function handleLogout() {
+async function handleLogout() {
+  // Clear the server session cookie in the background — no navigation,
+  // so the view switch below is instant and cannot be undone by the
+  // server re-identifying the user on a fresh page load.
+  try { await fetch('/logout', { credentials: 'same-origin' }); } catch (_) {}
+
   // Wipe all client-side session state
   weeks     = [];
   username  = '';
   guestMode = false;
   cur       = 0;
+  closeModal();
   document.getElementById('hud-user').textContent  = '...';
   document.getElementById('hud-score').textContent = '— pts';
   document.getElementById('logout-btn').style.display = 'none';
-  document.getElementById('game-wrap').style.display  = 'none';
 
-  // Server /logout deletes the hf_session cookie and redirects to /.
-  // location.replace() swaps the current history entry, so Back cannot
-  // return to the authenticated map view.
-  window.location.replace('/logout');
+  // View routing — exact reverse of init()'s login-success switch:
+  // map container hidden, login container shown.
+  document.getElementById('game-wrap').style.display      = 'none';
+  document.getElementById('screen-loading').style.display = 'none';
+  document.getElementById('screen-login').style.display   = 'flex';
 }
 
 // If the browser restores this page from the back/forward cache after a
