@@ -38,6 +38,21 @@
     #hud-title { font-size: 9px; color: #FFD700; letter-spacing: 1px; text-shadow: 0 0 8px rgba(255,215,0,.5); }
     #hud-user  { font-size: 8px; color: #87CEEB; }
     #hud-score { font-size: 8px; color: #FFD700; }
+    #hud-center { display: flex; align-items: center; gap: 10px; }
+    #logout-btn {
+      display: none;               /* shown once a session (or guest view) is active */
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      padding: 5px 9px;
+      cursor: pointer;
+      color: #ffb0b0;
+      background: #3a1010;
+      border: 1px solid #8a2020;
+      box-shadow: 2px 2px 0 rgba(0,0,0,.6);
+      letter-spacing: 1px;
+    }
+    #logout-btn:hover, #logout-btn:focus { background: #8a2020; color: #fff; }
+    #logout-btn:active { box-shadow: none; transform: translate(2px, 2px); }
 
     /* ── Game canvas wrapper ── */
     #game-wrap {
@@ -322,7 +337,10 @@
 <!-- HUD -->
 <div id="hud">
   <span id="hud-title">★ NTU MARA QUEST ★</span>
-  <span id="hud-user">...</span>
+  <span id="hud-center">
+    <span id="hud-user">...</span>
+    <button id="logout-btn" onclick="handleLogout()">⏻ LOG OUT</button>
+  </span>
   <span id="hud-score">— pts</span>
 </div>
 
@@ -1100,6 +1118,33 @@ function escHtml(s) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  Logout
+// ══════════════════════════════════════════════════════════════════
+function handleLogout() {
+  // Wipe all client-side session state
+  weeks     = [];
+  username  = '';
+  guestMode = false;
+  cur       = 0;
+  document.getElementById('hud-user').textContent  = '...';
+  document.getElementById('hud-score').textContent = '— pts';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('game-wrap').style.display  = 'none';
+
+  // Server /logout deletes the hf_session cookie and redirects to /.
+  // location.replace() swaps the current history entry, so Back cannot
+  // return to the authenticated map view.
+  window.location.replace('/logout');
+}
+
+// If the browser restores this page from the back/forward cache after a
+// logout, force a full reload — the fresh /api/syllabus-data call will
+// 401 and land on the login screen instead of showing stale map state.
+window.addEventListener('pageshow', e => {
+  if (e.persisted) window.location.reload();
+});
+
+// ══════════════════════════════════════════════════════════════════
 //  Guest mode
 // ══════════════════════════════════════════════════════════════════
 async function startGuestMode() {
@@ -1114,6 +1159,7 @@ async function startGuestMode() {
   }
   document.getElementById('hud-user').textContent  = '👤 GUEST';
   document.getElementById('hud-score').textContent = '0 / 100 PTS';
+  document.getElementById('logout-btn').style.display = 'inline-block';
   document.getElementById('screen-login').style.display = 'none';
   document.getElementById('game-wrap').style.display    = 'block';
   cur = 0;
@@ -1147,6 +1193,7 @@ async function init() {
     weeks = data.weeks || [];
 
     document.getElementById('hud-user').textContent = `👤 ${username.toUpperCase()}`;
+    document.getElementById('logout-btn').style.display = 'inline-block';
     // Score totals: all 14 nodes (12 weeks + Q4 + Q7).
     // max_points for every node comes from the sheet; they sum to 100.
     let tot = 0, max = 0;
