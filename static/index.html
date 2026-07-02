@@ -411,13 +411,17 @@ function nodeIdx(id) {
   return NODES.findIndex(n => n.id === id);
 }
 
+// Frequently-used node indices, resolved once — nodeIdx is a linear scan
+// and several of these were being re-resolved inside the 60fps render loop.
+const IDX_W4  = nodeIdx('W4'),  IDX_W5  = nodeIdx('W5'),  IDX_W7  = nodeIdx('W7');
+const IDX_Q4  = nodeIdx('Q4'),  IDX_Q7  = nodeIdx('Q7');
+const IDX_W10 = nodeIdx('W10'), IDX_W11 = nodeIdx('W11'), IDX_W12 = nodeIdx('W12');
+
 // Quiz branch map: pressing ↓ on a main-path node enters its quiz branch.
-// Derived from node ids so indices never get out of sync with the array.
 const BRANCH_DOWN = {
-  [nodeIdx('W4')]: nodeIdx('Q4'),  // W4 (idx 3)  → Q4  (idx 12)
-  [nodeIdx('W7')]: nodeIdx('Q7'),  // W7 (idx 6)  → Q7  (idx 13)
+  [IDX_W4]: IDX_Q4,  // W4 → Q4
+  [IDX_W7]: IDX_Q7,  // W7 → Q7
 };
-const BRANCH_UP = {};  // no upward branches
 
 // ── Zone helper ───────────────────────────────────────────────────
 function nodeZone(i) {
@@ -428,31 +432,41 @@ function nodeZone(i) {
 
 // Look up week data by explicit dataIndex + type to avoid off-by-one errors
 // when the Google Sheet includes interspersed quiz rows.
+// Results are cached per node — weekData runs 14× per frame in the render
+// loop, so each node's sheet row is resolved once per data load.
+const EMPTY_WEEK = {admin_step:0, max_points:0, user_score:null, week:'', theme:'', objectives:''};
+let weekDataCache = [];
+
+function invalidateWeekData() { weekDataCache = []; }
+
 function weekData(i) {
+  if (weekDataCache[i]) return weekDataCache[i];
   const node = NODES[i];
-  if (!node) return {admin_step:0, max_points:0, user_score:null, week:'', theme:'', objectives:''};
+  if (!node) return EMPTY_WEEK;
   const di      = node.dataIndex;  // 1-based week number
   const isQuiz  = node.type === 'quiz';
   const target  = `week ${di}`;
 
-  // Primary: label-based search (robust against interspersed quiz rows in sheets)
+  let row = null;
   if (isQuiz) {
-    // Quiz nodes match rows labelled exactly "Week N Quiz" (any capitalisation/spacing)
-    const quizRow = weeks.find(w => {
+    // Quiz nodes match ONLY rows labelled "Week N Quiz". Deliberately no
+    // fall-through to the plain "Week N" row: that would display the week's
+    // content on the quiz node AND double-count its points in the HUD total.
+    row = weeks.find(w => {
       const lbl = (w.week || '').trim().toLowerCase();
       return (lbl === target + ' quiz' || lbl.startsWith(target + ' ') && /quiz/i.test(lbl));
-    });
-    if (quizRow) return quizRow;
+    }) || null;
+  } else {
+    // Week nodes: label match first, positional fallback second.
+    row = weeks.find(w => {
+      const lbl = (w.week || '').trim().toLowerCase();
+      return lbl === target || (lbl.startsWith(target + ' ') && !/quiz/i.test(lbl));
+    }) || weeks[di - 1] || null;
   }
-  // Regular week (or quiz fallback): match exact "Week N" or "Week N <non-quiz suffix>"
-  const weekRow = weeks.find(w => {
-    const lbl = (w.week || '').trim().toLowerCase();
-    return lbl === target || (lbl.startsWith(target + ' ') && !/quiz/i.test(lbl));
-  });
-  if (weekRow) return weekRow;
 
-  // Final fallback: 0-based positional lookup
-  return weeks[di - 1] || {admin_step:0, max_points:0, user_score:null, week:'', theme:'', objectives:''};
+  const result = row || EMPTY_WEEK;
+  weekDataCache[i] = result;
+  return result;
 }
 
 function isUnlocked(i) {
@@ -552,9 +566,10 @@ ctx.webkitImageSmoothingEnabled  = false;
 function drawAnimCacti() {
   const H = 36;
   const col = '#2d6a1e', dark = '#1a4011', tip = '#4caf50';
+  const now = Date.now();
 
   ANIM_CACTI.forEach(({x, y}, idx) => {
-    const sway = Math.sin(Date.now() * 0.004 + idx) * 0.03;
+    const sway = Math.sin(now * 0.004 + idx) * 0.03;
 
     ctx.save();
     ctx.translate(x, y);
@@ -692,8 +707,8 @@ function paths() {
     ctx.setLineDash([]);
   }
   // Side branches — explicitly wired by node id
-  drawBranchSegment(nodeIdx('W4'), nodeIdx('Q4'));  // W4 main road → Q4 quiz branch (↓)
-  drawBranchSegment(nodeIdx('W7'), nodeIdx('Q7'));  // W7 main road → Q7 quiz branch (↓)
+  drawBranchSegment(IDX_W4, IDX_Q4);  // W4 main road → Q4 quiz branch (↓)
+  drawBranchSegment(IDX_W7, IDX_Q7);  // W7 main road → Q7 quiz branch (↓)
   ctx.setLineDash([]);
   ctx.restore();
 }
@@ -715,7 +730,7 @@ function nodes() {
   NODES.forEach((node, i) => {
     const {x, y}   = node;
     const w        = weekData(i);
-    const locked   = !guestMode && w.admin_step === 0;
+    const locked   = !isUnlocked(i);
     const completed= guestMode || (w.user_score != null && w.user_score > 0);
     const isCur    = i === cur;
     const zone     = nodeZone(i);
@@ -844,9 +859,9 @@ function player() {
 
 // Glowing dashed wire pulse along the cyber road W10 → W11 → W12
 function drawCyberPulse() {
-  const w10 = NODES[nodeIdx('W10')];
-  const w11 = NODES[nodeIdx('W11')];
-  const w12 = NODES[nodeIdx('W12')];
+  const w10 = NODES[IDX_W10];
+  const w11 = NODES[IDX_W11];
+  const w12 = NODES[IDX_W12];
 
   ctx.save();
   ctx.strokeStyle = 'rgba(0, 243, 255, 0.8)';
@@ -941,7 +956,24 @@ function drawRoamingSnake() {
   ctx.restore();
 }
 
+// Single-loop guard: init() and startGuestMode() can each be entered
+// multiple times per page life (login → logout → guest → …); without
+// this flag every entry would stack another concurrent rAF loop and
+// all animations would run at 2×, 3×… speed.
+let rafActive = false;
+
+function startLoop() {
+  if (rafActive) return;
+  rafActive = true;
+  requestAnimationFrame(tick);
+}
+
+function stopLoop() {
+  rafActive = false;
+}
+
 function tick() {
+  if (!rafActive) return;   // loop stopped (logout) — don't re-queue
   frame++;
 
   updateParticles();
@@ -954,7 +986,7 @@ function tick() {
   paths();             // road network
   drawCyberPulse();    // cyber biome: animated wire pulses over roads
   drawParticles();     // jungle fireflies + desert dust motes
-  drawRoamingSnake(); // jungle tier: roaming 16-bit snake sprite
+  drawRoamingSnake();  // jungle tier: roaming 16-bit snake sprite
   nodes();             // course node buttons
   player();            // player avatar
 
@@ -965,6 +997,10 @@ function tick() {
 //  Input
 // ══════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
+  // Ignore game input while the loading or login screen is showing —
+  // otherwise Enter would pop an empty modal over the login prompt.
+  if (document.getElementById('game-wrap').style.display !== 'block') return;
+
   if (document.getElementById('modal-wrap').classList.contains('open')) {
     if (e.key === 'Escape') { closeModal(); e.preventDefault(); }
     return;
@@ -982,19 +1018,14 @@ document.addEventListener('keydown', e => {
     else if (cur > 0)  { cur--; }
     e.preventDefault();
   } else if (e.key === 'ArrowDown') {
-    // Enter downward branch (W4/W7 → Quiz), W5 → W4 shortcut, or exit branch back to parent
+    // Enter downward branch (W4/W7 → Quiz), or W5 → W4 shortcut
     if (BRANCH_DOWN[cur] !== undefined) { cur = BRANCH_DOWN[cur]; e.preventDefault(); }
-    else if (cur === nodeIdx('W5')) { cur = nodeIdx('W4'); e.preventDefault(); }  // W5 → W4 shortcut
-    else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y > node.y) {
-      // Parent is below this branch node → DOWN navigates back toward parent
-      cur = node.branchFrom; e.preventDefault();
-    }
+    else if (cur === IDX_W5) { cur = IDX_W4; e.preventDefault(); }  // W5 → W4 shortcut
   } else if (e.key === 'ArrowUp') {
-    // W4 → W5 shortcut, exit downward branch back to parent (Quiz → parent)
-    if (cur === nodeIdx('W4')) { cur = nodeIdx('W5'); e.preventDefault(); }  // W4 → W5 shortcut
-    else if (BRANCH_UP[cur] !== undefined) { cur = BRANCH_UP[cur]; e.preventDefault(); }
-    else if (node.isBranch && NODES[node.branchFrom] && NODES[node.branchFrom].y < node.y) {
-      // Parent is above this branch node → UP navigates back toward parent
+    // W4 → W5 shortcut, or exit downward branch back to parent (Quiz → parent)
+    if (cur === IDX_W4) { cur = IDX_W5; e.preventDefault(); }  // W4 → W5 shortcut
+    else if (node.isBranch) {
+      // Both quiz branches hang below their parent → UP returns to parent
       cur = node.branchFrom; e.preventDefault();
     }
   } else if (e.key === 'Enter' || e.key === ' ') {
@@ -1023,7 +1054,7 @@ function openModal(idx) {
   const w      = weekData(idx);
   if (!w) return;
 
-  const locked = !guestMode && w.admin_step === 0;
+  const locked = !isUnlocked(idx);
   const mp     = w.max_points;
   const sc     = w.user_score;
 
@@ -1067,7 +1098,9 @@ function openModal(idx) {
   function parseLines() {
     return (w.objectives || '').replace(/\r/g, '')
       .split('\n')
-      .map(l => l.replace(/^[\s•\-\*\d\.]+/, '').trim())
+      // Strip list markers ("• ", "- ", "* ", "1. ", "2) ") but only when
+      // followed by a space, so objectives like "3NF schema" keep their digit.
+      .map(l => l.replace(/^\s*(?:[•\-\*]|\d+[\.\)])\s+/, '').trim())
       .filter(l => l.length > 0);
   }
 
@@ -1118,6 +1151,36 @@ function escHtml(s) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  View routing — single source of truth for screen transitions
+// ══════════════════════════════════════════════════════════════════
+function showLoginScreen() {
+  document.getElementById('screen-loading').style.display = 'none';
+  document.getElementById('screen-login').style.display   = 'flex';
+  document.getElementById('game-wrap').style.display      = 'none';
+}
+
+function enterGameView() {
+  document.getElementById('logout-btn').style.display = 'inline-block';
+  document.getElementById('screen-loading').style.display = 'none';
+  document.getElementById('screen-login').style.display   = 'none';
+  document.getElementById('game-wrap').style.display      = 'block';
+  cur = 0;
+  startLoop();
+}
+
+// Score totals: all 14 nodes (12 weeks + Q4 + Q7). max_points come from
+// the sheet and sum to 100; null user_scores contribute 0.
+function updateHudScore() {
+  let tot = 0, max = 0;
+  NODES.forEach((node, i) => {
+    const w = weekData(i);
+    tot += (w.user_score  || 0);
+    max += (w.max_points  || 0);
+  });
+  document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  Logout
 // ══════════════════════════════════════════════════════════════════
 async function handleLogout() {
@@ -1131,16 +1194,13 @@ async function handleLogout() {
   username  = '';
   guestMode = false;
   cur       = 0;
+  invalidateWeekData();
+  stopLoop();
   closeModal();
   document.getElementById('hud-user').textContent  = '...';
   document.getElementById('hud-score').textContent = '— pts';
   document.getElementById('logout-btn').style.display = 'none';
-
-  // View routing — exact reverse of init()'s login-success switch:
-  // map container hidden, login container shown.
-  document.getElementById('game-wrap').style.display      = 'none';
-  document.getElementById('screen-loading').style.display = 'none';
-  document.getElementById('screen-login').style.display   = 'flex';
+  showLoginScreen();
 }
 
 // If the browser restores this page from the back/forward cache after a
@@ -1163,21 +1223,10 @@ async function startGuestMode() {
   } catch (_) {
     weeks = [];
   }
-  document.getElementById('hud-user').textContent  = '👤 GUEST';
-  // Same score aggregation as init(): sheet max_points sum to 100; with no
-  // GUEST score column all user_scores are null, rendering "0 / 100 PTS".
-  let tot = 0, max = 0;
-  NODES.forEach((node, i) => {
-    const w = weekData(i);
-    tot += (w.user_score  || 0);
-    max += (w.max_points  || 0);
-  });
-  document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
-  document.getElementById('logout-btn').style.display = 'inline-block';
-  document.getElementById('screen-login').style.display = 'none';
-  document.getElementById('game-wrap').style.display    = 'block';
-  cur = 0;
-  requestAnimationFrame(tick);
+  invalidateWeekData();
+  document.getElementById('hud-user').textContent = '👤 GUEST';
+  updateHudScore();
+  enterGameView();
 }
 
 document.getElementById('guest-mode-btn').addEventListener('click', startGuestMode);
@@ -1190,8 +1239,7 @@ async function init() {
     const res = await fetch('/api/syllabus-data', { credentials: 'same-origin' });
 
     if (res.status === 401) {
-      document.getElementById('screen-loading').style.display = 'none';
-      document.getElementById('screen-login').style.display   = 'flex';
+      showLoginScreen();
       return;
     }
 
@@ -1205,27 +1253,20 @@ async function init() {
     username   = data.username || 'Guest';
     // Keep ALL rows (including any interspersed quiz rows) so weekData() label-search works correctly
     weeks = data.weeks || [];
+    invalidateWeekData();
 
     document.getElementById('hud-user').textContent = `👤 ${username.toUpperCase()}`;
-    document.getElementById('logout-btn').style.display = 'inline-block';
-    // Score totals: all 14 nodes (12 weeks + Q4 + Q7).
-    // max_points for every node comes from the sheet; they sum to 100.
-    let tot = 0, max = 0;
-    NODES.forEach((node, i) => {
-      const w = weekData(i);
-      tot += (w.user_score  || 0);
-      max += (w.max_points  || 0);
-    });
-    document.getElementById('hud-score').textContent = `${tot} / ${max} PTS`;
+    updateHudScore();
 
-    if (!data.user_col_found && username !== 'dev') {
+    if (data.fallback) {
+      // Sheet unreachable — server sent MOCK_WEEKS. Say so instead of the
+      // misleading "name not in sheet" (the sheet wasn't consulted at all).
+      document.getElementById('hud-score').textContent += '  ⚠ sheet unavailable — sample data';
+    } else if (!data.user_col_found && username !== 'dev') {
       document.getElementById('hud-score').textContent += '  ⚠ name not in sheet';
     }
 
-    document.getElementById('screen-loading').style.display = 'none';
-    document.getElementById('game-wrap').style.display      = 'block';
-
-    requestAnimationFrame(tick);
+    enterGameView();
 
   } catch (err) {
     document.getElementById('screen-loading').innerHTML =

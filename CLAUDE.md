@@ -41,19 +41,19 @@ Without OAuth configured, `/api/syllabus-data` works without auth. Without Sheet
 - **OAuth flow** — `/login` → HuggingFace → `/callback` → signed `hf_session` cookie via `itsdangerous.URLSafeSerializer`
 - **`_current_user(request)`** — reads `X-HF-Username`/`X-HF-User-Id`/`X-HF-User` headers (HF Space injection) or the `hf_session` cookie
 - **`/api/syllabus-data`** — fetches the Google Sheet, finds the user's score column by HF username, returns per-week scores; falls back to `MOCK_WEEKS` on any Sheets error
-- **`/api/guest-data`** — public endpoint returning `MOCK_WEEKS` with no scores
-- **`MOCK_WEEKS`** — 14-entry list used as fallback and for guest mode
+- **`/api/guest-data`** — public endpoint; fetches the live sheet with the same parsing pipeline, resolving scores from a `GUEST` (or `default`) column header; falls back to `MOCK_WEEKS` only when the sheet is unreachable
+- **`MOCK_WEEKS`** — 14-entry list used as the unreachable-sheet fallback for both endpoints
 
 ### Frontend (`static/index.html`)
 
-- **`NODES` array** — source of truth for all 14 course nodes; each has `id`, zone, canvas `x`/`y`, and week label
-- **Canvas render loop** — `tick()` calls `nodes()` + `drawPaths()` every frame; pan/zoom state in `camX`/`camY`/`zoom`
-- **`weekData(i)`** — maps node index → sheet row; called per node per frame (optimization opportunity: memoize)
-- **`openModal(id)`** — builds and displays the per-node progress modal
+- **`NODES` array** — source of truth for all 14 course nodes; each has `id`, `label`, `type` (`'week'`/`'quiz'`), `dataIndex`, and canvas `x`/`y` (quiz nodes also carry `isBranch`/`branchFrom`)
+- **Canvas render loop** — `tick()` calls `paths()` + `nodes()` + `player()` plus animation overlays every frame; guarded by `startLoop()`/`stopLoop()` so only one rAF loop ever runs
+- **`weekData(i)`** — maps node index → sheet row by label search; memoized in `weekDataCache`, reset via `invalidateWeekData()` whenever `weeks` is reassigned
+- **`openModal(idx)`** — builds and displays the per-node progress modal, themed by biome via `data-theme`
 
 ## Making Changes
 
-**Adding a course node** — add an entry to `NODES` in `static/index.html` with `id`, `zone`, `x`/`y` canvas coordinates, and `week` label.
+**Adding a course node** — add an entry to `NODES` in `static/index.html` with `id`, `label`, `type`, `dataIndex`, and `x`/`y` canvas coordinates (plus `isBranch`/`branchFrom` for quiz branches).
 
 **Editing week content** — update `MOCK_WEEKS` in `main.py` (used for guest mode and fallback); the authoritative content lives in the Google Sheet.
 
@@ -67,7 +67,7 @@ Without OAuth configured, `/api/syllabus-data` works without auth. Without Sheet
 python -m pytest tests/ -v
 ```
 
-All 49 tests must pass. Never push code that breaks the test suite.
+All 50 tests must pass. Never push code that breaks the test suite.
 
 ### Test structure
 
