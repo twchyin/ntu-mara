@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NTU MARA Quest</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -54,29 +54,167 @@
     #logout-btn:hover, #logout-btn:focus { background: #8a2020; color: #fff; }
     #logout-btn:active { box-shadow: none; transform: translate(2px, 2px); }
 
-    /* ── Game canvas wrapper ── */
+    /* ── Game map frame (pannable / zoomable ocean viewport) ── */
     #game-wrap {
       position: relative;
       width: 100%;
       max-width: 1000px;
+      padding-top: 10px;
+    }
+    #map-frame {
+      position: relative;
+      width: 100%;
+      height: 520px;
+      background: #0a3d5c;
+      border: 3px solid #041c2e;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 10px 0 #041420, 0 16px 30px rgba(0,0,0,.4);
+      touch-action: none;
+      cursor: grab;
+    }
+    #map-frame.panning { cursor: grabbing; }
+    #world {
+      position: absolute;
+      top: 0; left: 0;
+      width: 1000px;
+      height: 600px;
+      transform-origin: 0 0;
     }
     #c {
-      display: block;
-      width: 100%;
+      position: absolute;
+      top: 0; left: 0;
+      width: 1000px;
+      height: 600px;
       /* Background overworld art — canvas is transparent on top of this */
       background-image: url('assets/overworld_map.png');
       background-size: 100% 100%;
       background-repeat: no-repeat;
       background-position: center;
-      /* Pixel-perfect rendering — no browser blur */
       image-rendering: -moz-crisp-edges;
       image-rendering: -webkit-crisp-edges;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
-      border-left: 4px solid #FFD700;
-      border-right: 4px solid #FFD700;
-      border-bottom: 4px solid #FFD700;
-      cursor: default;
+      pointer-events: none;
+    }
+    #trail {
+      position: absolute;
+      top: 0; left: 0;
+      width: 1000px;
+      height: 600px;
+      pointer-events: none;
+      overflow: visible;
+    }
+    #deco-layer, #deco-layer * { pointer-events: none; }
+    #player-sprite {
+      position: absolute;
+      font-size: 22px;
+      pointer-events: none;
+      filter: drop-shadow(0 3px 2px rgba(0,0,0,.5));
+      animation: playerBob 1.2s ease-in-out infinite;
+      z-index: 3;
+    }
+
+    /* ── Node cards (DOM layer over the canvas) ── */
+    .node-card {
+      position: absolute;
+      width: 74px;
+      padding: 5px 7px;
+      border-radius: 10px;
+      border: 2px solid;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-align: left;
+      cursor: pointer;
+      font-family: 'Inter', system-ui, sans-serif;
+      transition: transform 0.35s cubic-bezier(.34,1.56,.64,1);
+      animation: nodePop 0.4s ease backwards;
+      z-index: 2;
+    }
+    .node-card:hover { transform: scale(1.14) rotate(-1.5deg); }
+    .node-card .icon {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      font-size: 12px;
+    }
+    .node-card .code {
+      min-width: 0;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .node-card[data-status="done"] {
+      border-color: #2fae4e;
+      background: #16341f;
+      box-shadow: 0 4px 0 #0d2413;
+    }
+    .node-card[data-status="done"] .icon { background: radial-gradient(circle at 30% 30%, #7ee89a, #2fae4e 75%); color: #0b3a1a; }
+    .node-card[data-status="done"] .code { color: #eafff0; }
+    .node-card[data-status="current"] {
+      border-color: #ffd23f;
+      background: #3a3213;
+      box-shadow: 0 0 0 3px rgba(255,210,63,.3), 0 4px 0 #7a5c00;
+      animation: nodePop 0.4s ease backwards, currentPulse 1.8s ease-in-out infinite;
+    }
+    .node-card[data-status="current"] .icon { background: radial-gradient(circle at 30% 30%, #fff1b8, #ffd23f 75%); color: #4a3200; }
+    .node-card[data-status="current"] .code { color: #fffbe8; }
+    .node-card[data-status="locked"] {
+      border-color: #5b6472;
+      background: #232a33;
+      box-shadow: 0 4px 0 #14181e;
+      opacity: 0.55;
+    }
+    .node-card[data-status="locked"] .icon { background: radial-gradient(circle at 30% 30%, #9aa4b2, #5b6472 75%); }
+    .node-card[data-status="locked"] .code { color: #c4ccd6; }
+    .node-card.selected { outline: 2px dashed rgba(255,255,255,.75); outline-offset: 3px; }
+    .boss-badge {
+      position: absolute;
+      top: -6px; right: -6px;
+      width: 12px; height: 12px;
+      border-radius: 3px;
+      background: #7a1410;
+      border: 1px solid #3a0b08;
+    }
+
+    /* ── Legend + zoom controls (fixed over the frame) ── */
+    #legend {
+      position: absolute;
+      left: 10px; top: 10px;
+      background: rgba(10,20,30,0.9);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 7px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: 'Inter', system-ui, sans-serif;
+      z-index: 5;
+    }
+    #legend .entry { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #e6f0ff; }
+    #legend .dot   { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    #legend .sq    { width: 10px; height: 10px; border-radius: 3px;  display: inline-block; }
+    #zoom-controls {
+      position: absolute;
+      right: 14px; bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 5;
+    }
+    #zoom-controls button {
+      width: 38px; height: 38px;
+      border-radius: 8px;
+      background: #3d4552;
+      border: 2px solid #000;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
     }
     #key-hints {
       text-align: center;
@@ -84,6 +222,31 @@
       color: #445;
       padding: 6px 0 10px;
       letter-spacing: 1px;
+    }
+
+    /* ── Map animations (from design handoff — exact keyframes) ── */
+    @keyframes dashMove   { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+    @keyframes cyberFlow  { from { stroke-dashoffset: 200;  } to { stroke-dashoffset: 0; } }
+    @keyframes nodePop    { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+    @keyframes currentPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,210,63,0.55), 0 4px 0 #7a5c00; }
+      50%      { box-shadow: 0 0 0 9px rgba(255,210,63,0),  0 4px 0 #7a5c00; }
+    }
+    @keyframes playerBob  { 0%, 100% { transform: translate(-50%,0); } 50% { transform: translate(-50%,-7px); } }
+    @keyframes twinkle    { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.95; } }
+    @keyframes dustDrift  { from { transform: translateX(0); opacity: 0; } 20% { opacity: 0.6; } to { transform: translateX(-46px); opacity: 0; } }
+    @keyframes fireflyRoam {
+      0%   { transform: translate(0,0); }
+      25%  { transform: translate(16px,-12px); }
+      50%  { transform: translate(-9px,-18px); }
+      75%  { transform: translate(-16px,5px); }
+      100% { transform: translate(0,0); }
+    }
+    @keyframes cactusSway  { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+    @keyframes sparkFlicker {
+      0%, 100% { opacity: 0;   transform: scale(0.3); }
+      45%      { opacity: 1;   transform: scale(1.15); }
+      60%      { opacity: 0.2; transform: scale(0.8); }
     }
 
     /* ── Loading / Login screens ── */
@@ -106,226 +269,242 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,.90);
+      background: rgba(4,6,10,0.78);
       z-index: 200;
       align-items: center;
       justify-content: center;
-      padding: 16px;
+      padding: 20px;
     }
     #modal-wrap.open { display: flex; }
 
     /* ── Biome theme variables (set via data-theme on #modal-box) ── */
     #modal-box[data-theme="desert"] {
-      --th-border:      #c8a05a;
+      --th-border:      #8a6a2e;
       --th-accent:      #e0b060;
-      --th-accent-glow: rgba(224,176,96,.35);
+      --th-accent-glow: rgba(224,176,96,.4);
       --th-header-bg:   linear-gradient(135deg, #3a2c14 0%, #2a1e0c 100%);
       --th-body-bg:     #241a0e;
-      --th-list-bg:     #2e2212;
-      --th-list-border: #4a3a20;
       --th-text:        #f0e0c0;
       --th-text-dim:    #a08a5e;
-      --th-bar-fill:    #e0a838;
-      --th-btn-bg:      #8a6a2e;
-      --th-btn-text:    #fff4d8;
     }
     #modal-box[data-theme="jungle"] {
-      --th-border:      #5a7a4a;
+      --th-border:      #4a6a3a;
       --th-accent:      #8ac070;
-      --th-accent-glow: rgba(138,192,112,.35);
+      --th-accent-glow: rgba(138,192,112,.4);
       --th-header-bg:   linear-gradient(135deg, #1e3016 0%, #14220e 100%);
       --th-body-bg:     #121e0c;
-      --th-list-bg:     #1a2a12;
-      --th-list-border: #33502a;
       --th-text:        #d8ecc8;
       --th-text-dim:    #7a9a68;
-      --th-bar-fill:    #6aaa4a;
-      --th-btn-bg:      #3a5c2c;
-      --th-btn-text:    #e8f8d8;
     }
     #modal-box[data-theme="cyber"] {
-      --th-border:      #00c8d8;
-      --th-accent:      #00f3ff;
-      --th-accent-glow: rgba(0,243,255,.4);
+      --th-border:      #0d6a78;
+      --th-accent:      #00e5ff;
+      --th-accent-glow: rgba(0,229,255,.45);
       --th-header-bg:   linear-gradient(135deg, #0a1428 0%, #081020 100%);
       --th-body-bg:     #070c1a;
-      --th-list-bg:     #0c1428;
-      --th-list-border: #1a3050;
       --th-text:        #c8ecf8;
       --th-text-dim:    #4a7a90;
-      --th-bar-fill:    #00d8e8;
-      --th-btn-bg:      #084858;
-      --th-btn-text:    #c8f8ff;
     }
 
     #modal-box {
-      max-width: 560px;
       width: 100%;
-      max-height: 92vh;
+      max-width: 400px;
+      max-height: 64vh;
       overflow-y: auto;
+      position: relative;
       background: var(--th-body-bg, #0c0c22);
-      border: 1px solid var(--th-border, #FFD700);
-      box-shadow: 4px 4px 0 rgba(0,0,0,.55), 0 0 16px var(--th-accent-glow, rgba(255,215,0,.2));
-      padding: 0;
+      border: 3px solid var(--th-border, #FFD700);
+      border-radius: 6px;
+      color: var(--th-text, #eee);
+      box-shadow: 6px 6px 0 rgba(0,0,0,.55), 0 0 22px var(--th-accent-glow, rgba(255,215,0,.2));
     }
     #modal-box::-webkit-scrollbar { width: 6px; }
     #modal-box::-webkit-scrollbar-thumb { background: var(--th-border, #FFD700); }
 
-    /* Header */
+    /* Header band */
     .modal-header {
       background: var(--th-header-bg, #16163a);
-      border-bottom: 1px solid var(--th-border, #FFD700);
-      padding: 20px 22px 16px;
+      border-bottom: 2px solid var(--th-border, #FFD700);
+      padding: 16px 18px 12px;
+      position: relative;
     }
-    .modal-week  {
-      font-size: 13px;
-      line-height: 1.5;
+    #modal-close-btn {
+      position: absolute;
+      top: 10px; right: 10px;
+      width: 24px; height: 24px;
+      background: rgba(255,255,255,0.08);
+      border: 2px solid var(--th-border, #888);
+      border-radius: 4px;
+      color: var(--th-text, #fff);
+      font-size: 12px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.3);
+      border: 2px solid var(--th-border, #888);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       color: var(--th-accent, #FFD700);
       margin-bottom: 8px;
+      font-family: 'JetBrains Mono', monospace;
     }
-    .modal-theme {
-      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--th-text, #87CEEB);
-      letter-spacing: 0.5px;
+    .modal-title {
+      font-family: 'VT323', monospace;
+      letter-spacing: 0.02em;
+      font-size: 24px;
+      font-weight: 400;
+      color: var(--th-text, #fff);
+      margin: 0 0 3px;
+      line-height: 1;
+      text-shadow: 2px 2px 0 rgba(0,0,0,.4);
+    }
+    .modal-island {
+      font-size: 11px;
+      color: var(--th-text-dim, #999);
+      margin: 0;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.02em;
     }
 
     /* Body */
-    .modal-body { padding: 20px 22px 22px; }
-
-    .section-label {
-      font-size: 8px;
+    .modal-body {
+      padding: 14px 18px 18px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .m-section-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
       color: var(--th-accent, #FFD700);
-      letter-spacing: 3px;
-      padding: 8px 0;
-      margin-bottom: 10px;
-      border-bottom: 1px solid var(--th-list-border, #2a2a50);
+      margin: 0 0 10px;
     }
-    .section-label:first-child { margin-top: 0; }
-
-    .obj-list,
-    .quiz-info-list {
-      list-style: none;
-      padding: 0;
+    .m-row {
+      background: #1a2030;
+      border: 1px solid #2c3548;
+      border-radius: 4px;
+    }
+    .m-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      border: 1px solid var(--th-border, #888);
+    }
+    .m-about { font-size: 13.5px; line-height: 1.7; color: #c8d0e4; margin: 0 0 20px; }
+    .m-star-row {
       display: flex;
-      flex-direction: column;
-      background: var(--th-list-bg, #0f0f2a);
-      border: 1px solid var(--th-list-border, #2a2a50);
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      font-size: 12.5px;
+      color: #d0d8e8;
     }
-    .obj-list li,
-    .quiz-info-list li {
-      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-      font-size: 12px;
-      font-weight: 400;
-      color: var(--th-text, #e0e0e0);
-      padding: 11px 14px 11px 12px;
-      line-height: 1.7;
-      letter-spacing: 0.5px;
-      border-bottom: 1px solid var(--th-list-border, #1a1a3a);
+    .m-star-row .glyph { font-size: 18px; color: var(--th-accent, #FFD700); }
+    .m-stack   { display: flex; flex-direction: column; gap: 8px; }
+    .m-tags    { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .m-tag     { padding: 6px 12px; font-size: 12.5px; color: #d0d8e8; }
+    .m-agenda-row {
       display: flex;
-      align-items: flex-start;
-      gap: 10px;
-    }
-    .obj-list li:last-child,
-    .quiz-info-list li:last-child { border-bottom: none; }
-    .obj-list li::before {
-      content: "★";
-      color: var(--th-accent, #FFD700);
-      font-size: 10px;
-      flex-shrink: 0;
-      margin-top: 3px;
-    }
-    .quiz-info-list li::before {
-      content: "◆";
-      color: var(--th-accent, #FF8C55);
-      font-size: 9px;
-      flex-shrink: 0;
-      margin-top: 4px;
-    }
-
-    /* Themed XP progress panel */
-    .xp-panel {
-      background: var(--th-list-bg, #1a1100);
-      border: 1px solid var(--th-list-border, #c8960c);
-      padding: 18px 16px 16px;
-      display: flex;
-      flex-direction: column;
       align-items: center;
       gap: 10px;
+      padding: 9px 12px;
+      font-size: 12.5px;
+      color: #d0d8e8;
     }
-    .xp-label { font-size: 8px; color: var(--th-text-dim, #c8960c); letter-spacing: 3px; }
-    .xp-value {
-      font-size: 22px;
-      color: var(--th-accent, #FFE135);
-      line-height: 1;
+    .m-time-badge {
+      background: #2c3548;
+      color: #9fb0d0;
+      border-radius: 3px;
+      padding: 2px 7px;
+      font-size: 10.5px;
+      font-weight: 600;
+      flex-shrink: 0;
     }
-    .xp-denom {
-      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    .m-skill-card { padding: 12px 14px; }
+    .m-skill-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #9fb0d0;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .m-skill-code {
+      font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
-      color: var(--th-text-dim, #997720);
-      letter-spacing: 0.5px;
+      color: #a8f0c0;
+      background: #0d1120;
+      border-radius: 4px;
+      padding: 8px 10px;
+      white-space: pre;
+      overflow-x: auto;
+      line-height: 1.6;
+      border: 1px solid #1e2436;
     }
-    .xp-bar {
-      width: 100%;
-      height: 16px;
-      background: rgba(0,0,0,.5);
-      border: 1px solid var(--th-border, #c8960c);
-      padding: 2px;
-    }
-    .xp-fill {
-      height: 100%;
-      background: var(--th-bar-fill, #FFD700);
-      /* Retro segmented look — 8px blocks with 2px gaps */
-      background-image: repeating-linear-gradient(
-        90deg,
-        transparent 0px, transparent 6px,
-        rgba(0,0,0,.35) 6px, rgba(0,0,0,.35) 8px
-      );
-      transition: width .3s steps(10);
-    }
-    .xp-pct {
-      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-      font-size: 10px;
-      color: var(--th-text-dim, #997720);
-    }
-    .star-row    { font-size: 22px; line-height: 1; letter-spacing: 4px; }
-    .star-full   { color: var(--th-accent, #FFD700); }
-    .star-empty  { color: rgba(255,255,255,.12); }
-
-    .no-score-msg,
-    .locked-msg {
-      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-      font-size: 12px;
-      color: var(--th-text-dim, #666);
-      letter-spacing: 0.5px;
-    }
-
-    /* Footer — themed close button */
-    .modal-footer {
-      border-top: 1px solid var(--th-list-border, #2a2a50);
-      padding: 14px 22px 16px;
+    .m-skill-desc { font-size: 12px; color: #8a97b8; margin-top: 8px; line-height: 1.5; }
+    .m-setup-row {
       display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 14px;
+    }
+    .m-setup-num {
+      width: 22px; height: 22px;
+      border-radius: 3px;
+      background: #2c3548;
+      color: #c0ccea;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
-    #modal-close-btn {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 9px;
-      padding: 10px 18px;
+    .m-setup-title { font-size: 12.5px; font-weight: 600; color: #dbe2f4; margin-bottom: 2px; }
+    .m-setup-desc  { font-size: 11.5px; color: #7a87a8; line-height: 1.45; }
+    .m-footer { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+    .m-btn-primary {
+      flex: 1;
+      min-width: 140px;
+      padding: 10px 16px;
+      border-radius: 4px;
+      font-size: 12.5px;
+      font-weight: 700;
+      text-align: center;
+      text-decoration: none;
+      background: var(--th-accent, #FFD700);
+      color: #111;
+      box-shadow: 2px 2px 0 rgba(0,0,0,.4);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .m-btn-outline {
+      flex: 1;
+      min-width: 140px;
+      padding: 10px 16px;
+      border-radius: 4px;
+      font-size: 12.5px;
+      font-weight: 700;
+      background: transparent;
+      color: var(--th-text-dim, #999);
+      border: 2px solid var(--th-border, #888);
       cursor: pointer;
-      color: var(--th-btn-text, #fff);
-      background: var(--th-btn-bg, #444);
-      border: 1px solid var(--th-border, #888);
-      box-shadow: 2px 2px 0 rgba(0,0,0,.6);
-    }
-    #modal-close-btn:hover,
-    #modal-close-btn:focus {
-      background: var(--th-accent, #666);
-      color: #000;
-    }
-    #modal-close-btn:active {
-      box-shadow: none;
-      transform: translate(2px, 2px);
+      font-family: 'JetBrains Mono', monospace;
     }
 
     /* NES.css overrides */
@@ -361,21 +540,38 @@
 
 <!-- Game -->
 <div id="game-wrap" style="display:none">
-  <canvas id="c" width="1000" height="600"></canvas>
-  <div id="key-hints">← → MOVE MAIN PATH &nbsp;|&nbsp; ↓ W4 QUIZ &nbsp;|&nbsp; ↓ W7 QUIZ &nbsp;|&nbsp; ENTER INSPECT &nbsp;|&nbsp; CLICK NODE</div>
+  <div id="map-frame">
+    <div id="world">
+      <canvas id="c" width="1000" height="600"></canvas>
+      <svg id="trail" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="deco-layer"></div>
+      <div id="player-sprite" style="display:none">🧑</div>
+      <div id="node-layer"></div>
+    </div>
+    <div id="legend">
+      <div class="entry"><span class="dot" style="background:#2fae4e"></span>Complete</div>
+      <div class="entry"><span class="dot" style="background:#ffd23f"></span>Current</div>
+      <div class="entry"><span class="dot" style="background:#5b6472"></span>Locked</div>
+      <div class="entry"><span class="sq"  style="background:#7a1410"></span>Boss/Quiz</div>
+    </div>
+    <div id="zoom-controls">
+      <button id="zoom-in"  aria-label="Zoom in">+</button>
+      <button id="zoom-out" aria-label="Zoom out">–</button>
+    </div>
+  </div>
+  <div id="key-hints">← → MOVE MAIN PATH &nbsp;|&nbsp; ↓ W4 QUIZ &nbsp;|&nbsp; ↓ W7 QUIZ &nbsp;|&nbsp; ENTER INSPECT &nbsp;|&nbsp; CLICK NODE &nbsp;|&nbsp; DRAG TO PAN</div>
 </div>
 
 <!-- Modal -->
 <div id="modal-wrap" role="dialog" aria-modal="true">
   <div id="modal-box">
     <div class="modal-header">
-      <div class="modal-week" id="m-week"></div>
-      <div class="modal-theme" id="m-theme"></div>
+      <button id="modal-close-btn" onclick="closeModal()" aria-label="Close">✕</button>
+      <div class="modal-pill" id="m-pill"></div>
+      <h2 class="modal-title" id="m-title"></h2>
+      <p class="modal-island" id="m-island"></p>
     </div>
     <div class="modal-body" id="m-body"></div>
-    <div class="modal-footer">
-      <button id="modal-close-btn" onclick="closeModal()">✕ CLOSE</button>
-    </div>
   </div>
 </div>
 
@@ -384,7 +580,6 @@
 //  Constants
 // ══════════════════════════════════════════════════════════════════
 const CW = 1000, CH = 600;
-const NR = 22;
 const MAIN_PATH_LEN = 12;   // indices 0–11 on the main trail
 
 // ── Node layout — 12 main path + 2 quiz side-branches ────────────
@@ -473,47 +668,66 @@ function isUnlocked(i) {
   return guestMode || weekData(i).admin_step === 1;
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  Animation overlay — decoration anchors & particle pool
-// ══════════════════════════════════════════════════════════════════
+// ── Static node copy (from the design handoff) ───────────────────
+// title/island/about are design content; live sheet data (theme,
+// objectives, scores) still drives the modal wherever it exists.
+const NODE_META = {
+  W1:  { title: 'Intro & SQL Basics', island: 'Desert — Onboarding', about: 'Set up VS Code and SQLTools, connect to a database, and write your first SQL queries against insurance claims data.',
+         stars: ['Install tools & create GitHub account', 'Read and profile tables with SELECT, FROM, LIMIT', 'Filter rows with WHERE and alias columns'] },
+  W2:  { title: 'Schema & Keys',      island: 'Desert Kingdom',      about: 'Explore tables, relationships, and primary keys to navigate the kingdom.',
+         stars: ['Inspect schema diagram', 'Filter with WHERE', 'Join two tables'] },
+  W3:  { title: 'Joining Tables',     island: 'Desert Kingdom',      about: 'Combine datasets using JOINs and learn to avoid duplicate pitfalls.',
+         stars: ['INNER JOIN mastery', 'LEFT JOIN comparisons', 'Handle duplicates'] },
+  W4:  { title: 'Aggregation',        island: 'Desert Kingdom',      about: 'Level up with aggregation and grouping across the realm.',
+         stars: ['GROUP BY and HAVING', 'Aggregate functions', 'Order results'] },
+  W5:  { title: 'Pandas Cleanup',     island: 'Jungle Valley',       about: 'Clean datasets and automate transformations with Python.',
+         stars: ['Load CSV with pandas', 'Clean missing values', 'Export cleaned data'] },
+  W6:  { title: 'Merging Data',       island: 'Jungle Valley',       about: 'Merge data sources and handle exceptions.',
+         stars: ['Merge two datasets', 'Handle key errors', 'Write reusable functions'] },
+  W7:  { title: 'Mini Pipeline',      island: 'Jungle Valley',       about: 'Build a mini pipeline that runs end-to-end.',
+         stars: ['Create ETL script', 'Schedule a run', 'Generate a report'] },
+  W8:  { title: 'Indexes',            island: 'Jungle Valley',       about: 'Learn to optimize queries with indexes and explain plans.',
+         stars: ['Identify slow queries', 'Add index', 'Compare execution plan'] },
+  W9:  { title: 'Query Refactor',     island: 'Jungle Valley',       about: 'Refactor queries for efficiency and cost.',
+         stars: ['Rewrite heavy query', 'Reduce scanned rows', 'Document improvements'] },
+  W10: { title: 'Performance',        island: 'Cyber Core',          about: 'Measure performance and enforce limits.',
+         stars: ['Set query timeout', 'Monitor performance', 'Optimize joins'] },
+  W11: { title: 'Final Prep',         island: 'Cyber Core',          about: 'Prepare for the boss stages and finalize your mastery.',
+         stars: ['Boss stage 1 clear', 'Boss stage 2 clear', 'Final reflection'] },
+  W12: { title: 'Showcase',           island: 'Cyber Core',          about: 'Complete the final showcase and celebrate your mastery.',
+         stars: ['Final demo', 'Peer review', 'Project showcase'] },
+  Q4:  { title: 'Week 4 Evaluation Quiz', island: 'Desert Kingdom', about: 'Hands-on database assessment covering everything through Week 4 — submit via the course portal before the deadline.',
+         stars: ['Complete the assessment', 'Submit before deadline'] },
+  Q7:  { title: 'Week 7 Evaluation Quiz', island: 'Jungle Valley',  about: 'Hands-on database assessment covering everything through Week 7 — submit via the course portal before the deadline.',
+         stars: ['Complete the assessment', 'Submit before deadline'] },
+};
 
-// Swaying cacti (x, y = base of cactus trunk)
-const ANIM_CACTI = [
-  {x:  50, y: 520},
-  {x: 380, y: 540},
-  {x: 930, y: 560},
+// ── Ambient decoration anchors (deterministic, from the handoff) ──
+const DECO_DUST = [
+  { x: 60,  y: 500, delay: 0   }, { x: 160, y: 545, delay: 0.6 }, { x: 340, y: 560, delay: 1.4 },
+  { x: 520, y: 520, delay: 2.1 }, { x: 780, y: 555, delay: 0.9 }, { x: 900, y: 500, delay: 1.8 },
+];
+const DECO_FIREFLIES = [
+  { x: 270, y: 240, delay: 0,   roamDur: 5.2 }, { x: 380, y: 320, delay: 0.7, roamDur: 6.1 },
+  { x: 500, y: 250, delay: 1.3, roamDur: 4.6 }, { x: 650, y: 330, delay: 0.4, roamDur: 5.8 },
+  { x: 700, y: 240, delay: 1.9, roamDur: 6.6 }, { x: 320, y: 370, delay: 1.1, roamDur: 5.0 },
+];
+const DECO_CACTI = [
+  { x: 90,  y: 555, delay: 0,   dur: 3.2, size: 26 },
+  { x: 360, y: 570, delay: 0.8, dur: 3.6, size: 22 },
+  { x: 900, y: 555, delay: 1.4, dur: 3.0, size: 24 },
+];
+const DECO_SPARKS = [
+  { x: 130, y: 55, delay: 0,   dur: 1.8 }, { x: 300, y: 40, delay: 0.5, dur: 2.1 },
+  { x: 470, y: 60, delay: 1.1, dur: 1.6 }, { x: 630, y: 45, delay: 0.3, dur: 2.3 },
+  { x: 800, y: 65, delay: 1.6, dur: 1.9 }, { x: 920, y: 50, delay: 0.9, dur: 2.0 },
 ];
 
-// Biome boundary boxes for particle loops
-const FIREFLY_BOUNDS = { minX: 150, maxX: 850, minY: 150, maxY: 380 };
-const DUST_BOUNDS    = { minX:   0, maxX: 1000, minY: 420, maxY: 600 };
-
-// Persistent particle pool — 10 fireflies (jungle) + 10 dust motes (desert)
-const PARTICLES = (() => {
-  const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
-  const p = [];
-  for (let i = 0; i < 10; i++) {
-    p.push({
-      x: rnd(FIREFLY_BOUNDS.minX, FIREFLY_BOUNDS.maxX),
-      y: rnd(FIREFLY_BOUNDS.minY, FIREFLY_BOUNDS.maxY),
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.3,
-      phase: Math.random() * Math.PI * 2,
-      type: 'firefly',
-    });
-  }
-  for (let i = 0; i < 10; i++) {
-    p.push({
-      x: rnd(DUST_BOUNDS.minX, DUST_BOUNDS.maxX),
-      y: rnd(DUST_BOUNDS.minY, DUST_BOUNDS.maxY),
-      vx: -0.4 - Math.random() * 0.4,  // drifts left
-      vy: (Math.random() - 0.5) * 0.15,
-      phase: Math.random() * Math.PI * 2,
-      type: 'dust',
-    });
-  }
-  return p;
-})();
+// Per-segment quadratic-bezier control point offsets for the main trail
+const CURVE_OFFSETS = [
+  [30, -40], [-35, 45], [40, 30], [-30, 35], [35, -25],
+  [-40, 30], [25, 40], [-35, -30], [30, 45], [-25, -35], [35, 25],
+];
 
 // ── Roaming jungle snake ─────────────────────────────────────────
 const JUNGLE_SNAKE = {
@@ -521,26 +735,6 @@ const JUNGLE_SNAKE = {
   speed: 0.45, direction: 1,
   minX: 280, maxX: 700,
   frameTimer: 0,
-};
-
-// ── Pixel-art player sprite — 8×12 grid @ 2 px/cell ──────────────
-const SPR = [
-  [0,1,1,1,1,1,0,0],
-  [1,1,1,1,1,1,1,0],
-  [0,2,2,2,2,2,2,0],
-  [0,2,3,2,2,3,2,0],
-  [0,2,2,2,2,2,2,0],
-  [0,2,2,2,2,2,2,0],
-  [0,4,4,4,4,4,4,0],
-  [4,4,4,4,4,4,4,4],
-  [4,4,4,4,4,4,4,4],
-  [0,5,5,0,0,5,5,0],
-  [5,5,5,0,0,5,5,5],
-  [6,6,0,0,0,0,6,6],
-];
-const SPR_C = {
-  1:'#5D4037', 2:'#FFCC80', 3:'#1565C0',
-  4:'#1976D2', 5:'#2E7D32', 6:'#4E342E',
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -562,359 +756,182 @@ ctx.webkitImageSmoothingEnabled  = false;
 
 
 
-// ── Swaying pixel cacti (desert biome decoration) ────────────────
-function drawAnimCacti() {
-  const H = 36;
-  const col = '#2d6a1e', dark = '#1a4011', tip = '#4caf50';
-  const now = Date.now();
 
-  ANIM_CACTI.forEach(({x, y}, idx) => {
-    const sway = Math.sin(now * 0.004 + idx) * 0.03;
-
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(sway);
-
-    // trunk
-    ctx.fillStyle = col;  ctx.fillRect(-4, -H, 8, H);
-    ctx.fillStyle = dark; ctx.fillRect( 2, -H + 5, 2, H - 5);
-    ctx.fillStyle = tip;  ctx.fillRect(-3, -H, 6, 3);
-
-    // left arm
-    const ay1 = -Math.round(H * 0.62);
-    ctx.fillStyle = col;
-    ctx.fillRect(-14, ay1, 10, 5);
-    ctx.fillRect(-14, ay1 - 12, 5, 14);
-    ctx.fillStyle = dark; ctx.fillRect(-12, ay1, 3, 5);
-    ctx.fillStyle = tip;  ctx.fillRect(-13, ay1 - 12, 4, 3);
-
-    // right arm
-    const ay2 = -Math.round(H * 0.42);
-    ctx.fillStyle = col;
-    ctx.fillRect(4, ay2, 10, 5);
-    ctx.fillRect(9, ay2 - 16, 5, 18);
-    ctx.fillStyle = dark; ctx.fillRect(6, ay2, 3, 5);
-    ctx.fillStyle = tip;  ctx.fillRect(8, ay2 - 16, 5, 3);
-
-    ctx.restore();
-  });
+// ══════════════════════════════════════════════════════════════════
+//  Node status — maps existing progress data into done/current/locked
+// ══════════════════════════════════════════════════════════════════
+function nodeStatus(i) {
+  if (!isUnlocked(i)) return 'locked';
+  const w = weekData(i);
+  const done = guestMode || (w.user_score != null && w.user_score > 0);
+  return done ? 'done' : 'current';
 }
 
-// ── Bezier control point (shared formula for main path) ──────────
-function getControlPoint(i) {
-  const p1   = NODES[i], p2 = NODES[i + 1];
-  const sign = i % 2 === 0 ? 1 : -1;
-  return {
-    x: (p1.x + p2.x) / 2 - (p2.y - p1.y) * 0.22 * sign,
-    y: (p1.y + p2.y) / 2 + (p2.x - p1.x) * 0.22 * sign,
+// ══════════════════════════════════════════════════════════════════
+//  Map pan / zoom (click-drag + zoom buttons)
+// ══════════════════════════════════════════════════════════════════
+const mapFrame = document.getElementById('map-frame');
+const worldEl  = document.getElementById('world');
+const view     = { x: 40, y: 46, scale: 0.68 };
+
+function applyView() {
+  worldEl.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
+}
+applyView();
+
+let dragState = null;
+mapFrame.addEventListener('pointerdown', e => {
+  // Presses that start on a node card / control button are clicks, not pans
+  if (e.target.closest('button')) return;
+  mapFrame.setPointerCapture(e.pointerId);
+  dragState = { startX: e.clientX, startY: e.clientY, origX: view.x, origY: view.y, moved: false };
+});
+mapFrame.addEventListener('pointermove', e => {
+  if (!dragState) return;
+  const dx = e.clientX - dragState.startX;
+  const dy = e.clientY - dragState.startY;
+  // 5px threshold: sub-pixel jitter during a click must not pan the map
+  // out from under the cursor before pointerup (real bug — see handoff).
+  if (!dragState.moved && Math.hypot(dx, dy) < 5) return;
+  dragState.moved = true;
+  mapFrame.classList.add('panning');
+  view.x = dragState.origX + dx;
+  view.y = dragState.origY + dy;
+  applyView();
+});
+function endPan() { dragState = null; mapFrame.classList.remove('panning'); }
+mapFrame.addEventListener('pointerup', endPan);
+mapFrame.addEventListener('pointercancel', endPan);
+
+function zoomBy(amt) {
+  view.scale = Math.min(Math.max(0.2, view.scale + amt), 1.2);
+  applyView();
+}
+document.getElementById('zoom-in').addEventListener('click',  () => zoomBy(+0.1));
+document.getElementById('zoom-out').addEventListener('click', () => zoomBy(-0.1));
+
+// ══════════════════════════════════════════════════════════════════
+//  Ambient decorations (CSS-animated DOM, built once)
+// ══════════════════════════════════════════════════════════════════
+function buildDecorations() {
+  const layer = document.getElementById('deco-layer');
+  const html = [];
+  DECO_DUST.forEach(p => html.push(
+    `<div style="position:absolute;left:${p.x}px;top:${p.y}px;width:3px;height:3px;border-radius:50%;` +
+    `background:#e0c88a;animation:dustDrift 5s linear infinite;animation-delay:${p.delay}s;"></div>`));
+  DECO_FIREFLIES.forEach(p => html.push(
+    `<div style="position:absolute;left:${p.x}px;top:${p.y}px;width:4px;height:4px;border-radius:50%;` +
+    `background:#c8ff6a;box-shadow:0 0 6px 2px rgba(200,255,106,.8);` +
+    `animation:twinkle 2.4s ease-in-out infinite,fireflyRoam ${p.roamDur}s ease-in-out infinite;` +
+    `animation-delay:${p.delay}s,${p.delay}s;"></div>`));
+  DECO_CACTI.forEach(c => html.push(
+    `<div style="position:absolute;left:${c.x}px;top:${c.y}px;font-size:${c.size}px;` +
+    `transform-origin:bottom center;animation:cactusSway ${c.dur}s ease-in-out infinite;` +
+    `animation-delay:${c.delay}s;">🌵</div>`));
+  DECO_SPARKS.forEach(p => html.push(
+    `<div style="position:absolute;left:${p.x}px;top:${p.y}px;width:3px;height:3px;border-radius:50%;` +
+    `background:#7ff5ff;box-shadow:0 0 8px 3px rgba(0,230,255,.9);` +
+    `animation:sparkFlicker ${p.dur}s ease-in-out infinite;animation-delay:${p.delay}s;"></div>`));
+  layer.innerHTML = html.join('');
+}
+buildDecorations();
+
+// ══════════════════════════════════════════════════════════════════
+//  Trail (SVG paths, rebuilt on data load)
+// ══════════════════════════════════════════════════════════════════
+function renderTrail() {
+  const svg  = document.getElementById('trail');
+  const glow = [];
+  const dash = [];
+  const cyber = [];
+
+  const segment = (a, b, cx, cy, colorB, isCyber) => {
+    const d = `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`;
+    glow.push(`<path d="${d}" fill="none" stroke="rgba(255,240,190,0.18)" stroke-width="20" stroke-linecap="round"/>`);
+    dash.push(`<path d="${d}" fill="none" stroke="${colorB}" stroke-width="4" stroke-dasharray="4,10" ` +
+              `stroke-linecap="round" style="animation:dashMove 20s linear infinite;"/>`);
+    if (isCyber) {
+      cyber.push(`<path d="${d}" fill="none" stroke="rgba(120,245,255,0.9)" stroke-width="2.5" ` +
+                 `stroke-dasharray="6,10" stroke-linecap="round" ` +
+                 `style="animation:cyberFlow 1.4s linear infinite;filter:drop-shadow(0 0 4px rgba(0,230,255,0.8));"/>`);
+    }
   };
-}
 
-// ── Helper: stroke one quadratic bezier with current style ───────
-function strokeBez(p1, cpx, cpy, p2) {
-  ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-  ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
-}
-
-// ── Draw one main-path segment (zone-specific styling) ───────────
-function drawMainSegment(i) {
-  const unl  = isUnlocked(i);
-  const {x: cpx, y: cpy} = getControlPoint(i);
-  const p1 = NODES[i], p2 = NODES[i + 1];
-  const zone = nodeZone(i);
-
-  ctx.setLineDash([]);
-
-  if (zone === 'cyber' && unl) {
-    ctx.save();
-    ctx.shadowColor = '#00FFFF'; ctx.shadowBlur = 18;
-    ctx.strokeStyle = '#001a1a'; ctx.lineWidth = 22; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = '#004444'; ctx.lineWidth = 14; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = '#00FFFF'; ctx.lineWidth =  4; strokeBez(p1,cpx,cpy,p2);
-    ctx.shadowBlur  = 0;
-    ctx.strokeStyle = 'rgba(0,255,255,0.45)'; ctx.lineWidth = 2;
-    ctx.setLineDash([8, 7]); strokeBez(p1,cpx,cpy,p2);
-    ctx.restore();
-  } else if (zone === 'cyber') {
-    ctx.strokeStyle = '#1a0022'; ctx.lineWidth = 22;
-    ctx.setLineDash([]); strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = 'rgba(80,0,100,0.4)'; ctx.lineWidth = 4;
-    ctx.setLineDash([6, 8]); strokeBez(p1,cpx,cpy,p2);
-  } else if (zone === 'desert') {
-    ctx.strokeStyle = unl ? '#4a2a0a' : '#211808'; ctx.lineWidth = 24; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? '#c07820' : '#382812'; ctx.lineWidth = 16; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? '#e0a838' : '#4a3818'; ctx.lineWidth =  8; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? 'rgba(255,225,130,0.5)' : 'rgba(170,140,70,0.15)';
-    ctx.lineWidth = 3; ctx.setLineDash([12, 10]); strokeBez(p1,cpx,cpy,p2);
-  } else {
-    ctx.strokeStyle = unl ? '#241400' : '#160e08'; ctx.lineWidth = 24; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? '#5c3418' : '#2a1c10'; ctx.lineWidth = 16; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? '#7a4c28' : '#382414'; ctx.lineWidth =  8; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? 'rgba(165,120,70,0.48)' : 'rgba(110,80,50,0.18)';
-    ctx.lineWidth = 3; ctx.setLineDash([12, 10]); strokeBez(p1,cpx,cpy,p2);
-  }
-}
-
-// ── Draw a side-branch segment (thinner, same zone palette) ──────
-function drawBranchSegment(fromIdx, toIdx) {
-  const p1   = NODES[fromIdx], p2 = NODES[toIdx];
-  const unl  = isUnlocked(fromIdx);
-  const zone = nodeZone(fromIdx);
-  // Straight control point → near-vertical/horizontal line
-  const cpx  = (p1.x + p2.x) / 2;
-  const cpy  = (p1.y + p2.y) / 2;
-
-  ctx.save();
-  ctx.lineCap  = 'round';
-  ctx.lineJoin = 'round';
-  ctx.setLineDash([]);
-
-  if (zone === 'desert') {
-    ctx.strokeStyle = unl ? '#5c3a10' : '#2a1808'; ctx.lineWidth = 14; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? '#d4a040' : '#3a2810'; ctx.lineWidth =  7; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? 'rgba(255,220,100,0.6)' : 'rgba(150,120,60,0.2)';
-    ctx.lineWidth = 3; ctx.setLineDash([10, 8]); strokeBez(p1,cpx,cpy,p2);
-  } else {
-    // Jungle
-    ctx.strokeStyle = unl ? '#241400' : '#140e08'; ctx.lineWidth = 14; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? '#7a4c28' : '#2e1c10'; ctx.lineWidth =  7; strokeBez(p1,cpx,cpy,p2);
-    ctx.strokeStyle = unl ? 'rgba(165,110,60,0.55)' : 'rgba(100,70,40,0.2)';
-    ctx.lineWidth = 3; ctx.setLineDash([10, 8]); strokeBez(p1,cpx,cpy,p2);
-  }
-
-  // Fork indicator: small diamond at branch origin
-  if (unl) {
-    ctx.setLineDash([]);
-    const mx = p1.x, my = p1.y + (p2.y > p1.y ? NR + 3 : -(NR + 3));
-    ctx.fillStyle = 'rgba(255,220,50,0.85)';
-    ctx.beginPath();
-    ctx.moveTo(mx, my - 5); ctx.lineTo(mx + 5, my);
-    ctx.lineTo(mx, my + 5); ctx.lineTo(mx - 5, my);
-    ctx.closePath(); ctx.fill();
-  }
-
-  ctx.restore();
-}
-
-// ── All paths ─────────────────────────────────────────────────────
-function paths() {
-  ctx.save();
-  ctx.lineCap  = 'round';
-  ctx.lineJoin = 'round';
-  // Main trail: W1 → W2 → … → W12
+  // Main trail W1→…→W12
   for (let i = 0; i < MAIN_PATH_LEN - 1; i++) {
-    drawMainSegment(i);
-    ctx.setLineDash([]);
+    const a = NODES[i], b = NODES[i + 1];
+    const [ox, oy] = CURVE_OFFSETS[i % CURVE_OFFSETS.length];
+    const cx = (a.x + b.x) / 2 + ox, cy = (a.y + b.y) / 2 + oy;
+    const sa = nodeStatus(i), sb = nodeStatus(i + 1);
+    const bothDone = sa === 'done' && (sb === 'done' || sb === 'current');
+    const zone = nodeZone(i);
+    const zoneTint = zone === 'cyber' ? 'rgba(0,216,232,0.4)'
+                   : zone === 'jungle' ? 'rgba(122,196,90,0.35)'
+                   : 'rgba(224,168,56,0.4)';
+    segment(a, b, cx, cy, bothDone ? '#ffd23f' : zoneTint, zone === 'cyber');
   }
-  // Side branches — explicitly wired by node id
-  drawBranchSegment(IDX_W4, IDX_Q4);  // W4 main road → Q4 quiz branch (↓)
-  drawBranchSegment(IDX_W7, IDX_Q7);  // W7 main road → Q7 quiz branch (↓)
-  ctx.setLineDash([]);
-  ctx.restore();
+
+  // Quiz side-branches W4→Q4, W7→Q7 (straight midpoint control — more direct)
+  [[IDX_W4, IDX_Q4], [IDX_W7, IDX_Q7]].forEach(([fi, ti]) => {
+    const a = NODES[fi], b = NODES[ti];
+    const unlocked = nodeStatus(fi) !== 'locked';
+    segment(a, b, (a.x + b.x) / 2, (a.y + b.y) / 2,
+            unlocked ? '#ffd23f' : 'rgba(255,255,255,0.25)', false);
+  });
+
+  svg.innerHTML = glow.join('') + dash.join('') + cyber.join('');
 }
 
-// ── Pixel padlock icon ────────────────────────────────────────────
-function drawPadlock(x, y) {
-  const s = 7;
-  ctx.strokeStyle = '#777'; ctx.lineWidth = 2; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.arc(x, y - s * 0.42, s * 0.33, Math.PI, 0); ctx.stroke();
-  ctx.fillStyle = '#555';
-  ctx.fillRect(x - s * 0.46, y - s * 0.18, s * 0.92, s * 0.75);
-  ctx.fillStyle = '#2a2a2a';
-  ctx.beginPath(); ctx.arc(x, y + s * 0.12, s * 0.14, 0, Math.PI * 2); ctx.fill();
-  ctx.fillRect(x - s * 0.06, y + s * 0.12, s * 0.12, s * 0.22);
-}
-
-// ── All nodes (main path + branches) ─────────────────────────────
-function nodes() {
+// ══════════════════════════════════════════════════════════════════
+//  Node cards (DOM buttons, rebuilt on data load)
+// ══════════════════════════════════════════════════════════════════
+function buildNodeCards() {
+  const layer = document.getElementById('node-layer');
+  layer.innerHTML = '';
   NODES.forEach((node, i) => {
-    const {x, y}   = node;
-    const w        = weekData(i);
-    const locked   = !isUnlocked(i);
-    const completed= guestMode || (w.user_score != null && w.user_score > 0);
-    const isCur    = i === cur;
-    const zone     = nodeZone(i);
-    const isQuiz   = node.type === 'quiz';
+    const status = nodeStatus(i);
+    const icon   = status === 'done' ? '✓' : status === 'current' ? '★' : '🔒';
+    const meta   = NODE_META[node.id] || {};
 
-    // Hard-reset all shadow state before drawing every node so nothing
-    // bleeds in from paths(), cyber pulse, or the previous node's glow border.
-    ctx.save();
-    ctx.shadowBlur    = 0;
-    ctx.shadowColor   = 'transparent';
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Selection ring
-    if (isCur) {
-      ctx.save();
-      ctx.shadowColor = zone === 'cyber' ? '#00FFFF' : '#ffffff';
-      ctx.shadowBlur  = 22;
-      ctx.beginPath(); ctx.arc(x, y, NR + 7, 0, Math.PI * 2);
-      ctx.strokeStyle = zone === 'cyber' ? 'rgba(0,255,255,0.9)' : 'rgba(255,255,255,0.9)';
-      ctx.lineWidth   = 3; ctx.stroke();
-      ctx.restore();
-    }
-
-    // Fill — flat solid colors, no radial gradients
-    ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2);
-    if (completed) {
-      ctx.fillStyle = '#4a75a0';  // uniform retro slate-blue for every cleared node
-    } else if (locked) {
-      ctx.fillStyle = '#404040';  // uniform dark grey for every locked node
-    } else if (isQuiz) {
-      ctx.fillStyle = '#d49020';  // gold-amber for active quiz branch
-    } else if (zone === 'cyber') {
-      ctx.fillStyle = '#008888';  // teal for active cyber nodes
-    } else if (zone === 'desert') {
-      ctx.fillStyle = '#c09020';  // sand-gold for active desert nodes
-    } else {
-      ctx.fillStyle = '#2a7a2a';  // forest green for active jungle nodes
-    }
-    ctx.fill();
-
-    // Border — uniform black outline for completed/active; dark tint for locked
-    const borderColor = locked ? '#1a1a1a' : '#000000';
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth   = 2;
-    ctx.beginPath(); ctx.arc(x, y, NR, 0, Math.PI * 2); ctx.stroke();
-
-    // Quiz outer ring (double-border to distinguish from main nodes)
-    if (isQuiz && !locked) {
-      ctx.strokeStyle = 'rgba(255,220,50,0.4)'; ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.arc(x, y, NR + 5, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // Label / padlock — use explicit label from node definition
-    const nodeLabel = node.label;
-
-    if (locked) {
-      drawPadlock(x, y);
-      ctx.fillStyle    = zone === 'cyber' ? '#334466' : '#666';
-      ctx.font         = 'bold 7px "Press Start 2P"';
-      ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(nodeLabel, x, y + NR + 10);
-    } else {
-      // Label text — cleared nodes use white so it reads against the flat blue fill
-      ctx.fillStyle    = completed ? '#fff' : (isQuiz ? '#FFD700' : (zone === 'cyber' ? '#00FFFF' : '#fff'));
-      ctx.font         = `bold ${nodeLabel.length > 2 ? 8 : 9}px "Press Start 2P"`;
-      ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(nodeLabel, x, y);
-
-      if (w.max_points > 0 && w.max_points <= 5) {
-        const score = w.user_score || 0;
-        let s = '';
-        for (let k = 0; k < w.max_points; k++) s += k < score ? '★' : '☆';
-        ctx.font      = '9px sans-serif';
-        ctx.fillStyle = completed ? '#FFD700' : (zone === 'cyber' ? '#00CCCC' : '#8a8');
-        ctx.fillText(s, x, y + NR + 11);
-      }
-
-      // Pixel checkmark badge on completed nodes (top-right corner of circle)
-      if (completed) {
-        const bx = x + Math.round(NR * 0.68);
-        const by = y - Math.round(NR * 0.68);
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(bx - 4, by - 4, 9, 9);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(bx - 3, by - 3, 7, 7);
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(bx - 2, by + 1, 2, 2);
-        ctx.fillRect(bx,     by + 3, 2, 2);
-        ctx.fillRect(bx + 2, by + 1, 2, 2);
-        ctx.fillRect(bx + 4, by - 1, 2, 2);
-      }
-    }
-
-    ctx.restore();  // ← paired with the save() at the top of this node's draw pass
+    const btn = document.createElement('button');
+    btn.className = 'node-card';
+    btn.dataset.status = status;
+    btn.dataset.idx = i;
+    btn.style.left = (node.x - 37) + 'px';
+    btn.style.top  = (node.y - 17) + 'px';
+    btn.style.animationDelay = (i * 60) + 'ms' + (status === 'current' ? ',0s' : '');
+    btn.title = (node.type === 'quiz' ? 'Quiz' : `Week ${node.dataIndex}`) + ' · ' + (meta.title || node.label);
+    btn.innerHTML =
+      `<div class="icon">${icon}</div>` +
+      `<div class="code">${node.label}</div>` +
+      (node.type === 'quiz' ? '<div class="boss-badge"></div>' : '');
+    btn.addEventListener('click', () => { setCur(i); openModal(i); });
+    layer.appendChild(btn);
   });
-}
-
-// ── Player — idle bob ─────────────────────────────────────────────
-function player() {
-  const {x, y} = NODES[cur];
-  const bob = Math.sin(frame * 0.105) * 3;
-  const ps  = 2;
-  const pw  = SPR[0].length * ps;
-  const ph  = SPR.length    * ps;
-  const px  = Math.round(x - pw / 2);
-  const py  = Math.round(y - NR - ph - 4 + bob);
-  SPR.forEach((row, ri) =>
-    row.forEach((c, ci) => {
-      if (!c) return;
-      ctx.fillStyle = SPR_C[c];
-      ctx.fillRect(px + ci * ps, py + ri * ps, ps, ps);
-    })
-  );
-  ctx.fillStyle = 'rgba(0,0,0,0.28)';
-  ctx.beginPath();
-  ctx.ellipse(x, y - NR - 2, 10, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
+  updateSelection();
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  Animation overlays
+//  Player sprite + keyboard selection
 // ══════════════════════════════════════════════════════════════════
-
-// Glowing dashed wire pulse along the cyber road W10 → W11 → W12
-function drawCyberPulse() {
-  const w10 = NODES[IDX_W10];
-  const w11 = NODES[IDX_W11];
-  const w12 = NODES[IDX_W12];
-
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0, 243, 255, 0.8)';
-  ctx.lineWidth   = 3;
-  ctx.shadowBlur  = 8;
-  ctx.shadowColor = '#00f3ff';
-  ctx.setLineDash([4, 16]);
-  ctx.lineDashOffset = -(performance.now() / 30) % 20;
-
-  ctx.beginPath();
-  ctx.moveTo(w10.x, w10.y);
-  ctx.lineTo(w11.x, w11.y);
-  ctx.lineTo(w12.x, w12.y);
-  ctx.stroke();
-
-  ctx.restore();
+function updatePlayer() {
+  const el = document.getElementById('player-sprite');
+  const node = NODES[cur];
+  if (!node) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.style.left = node.x + 'px';
+  el.style.top  = (node.y - 44) + 'px';
 }
 
-// Advance all particle positions; loop within their biome bounds
-function updateParticles() {
-  PARTICLES.forEach(p => {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.phase += 0.04;
-
-    if (p.type === 'firefly') {
-      if (p.x < FIREFLY_BOUNDS.minX || p.x > FIREFLY_BOUNDS.maxX) p.vx *= -1;
-      if (p.y < FIREFLY_BOUNDS.minY || p.y > FIREFLY_BOUNDS.maxY) p.vy *= -1;
-    } else {
-      // dust drifts left; wrap around to the right edge when off-screen
-      if (p.x < DUST_BOUNDS.minX) p.x = DUST_BOUNDS.maxX;
-      if (p.x > DUST_BOUNDS.maxX) p.x = DUST_BOUNDS.minX;
-      if (p.y < DUST_BOUNDS.minY || p.y > DUST_BOUNDS.maxY) p.vy *= -1;
-    }
-  });
+function updateSelection() {
+  document.querySelectorAll('.node-card').forEach(el =>
+    el.classList.toggle('selected', Number(el.dataset.idx) === cur));
 }
 
-// Draw fireflies (yellow-green blinking 2×2 dots) and dust (tan 3×1 dashes)
-function drawParticles() {
-  PARTICLES.forEach(p => {
-    if (p.type === 'firefly') {
-      const alpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(p.phase));
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle   = '#aaff44';
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2);
-    } else {
-      const alpha = 0.25 + 0.25 * (0.5 + 0.5 * Math.sin(p.phase));
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle   = '#c8a86a';
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), 3, 1);
-    }
-  });
-  ctx.globalAlpha = 1;
+function setCur(i) {
+  cur = i;
+  updatePlayer();
+  updateSelection();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -976,19 +993,11 @@ function tick() {
   if (!rafActive) return;   // loop stopped (logout) — don't re-queue
   frame++;
 
-  updateParticles();
-
-  // Background image is rendered by CSS — clear canvas to transparent
-  // so the image shows through, then draw only the interactive layer.
+  // Background image is rendered by CSS; paths/nodes/decorations are now
+  // DOM+SVG layers with their own CSS animations. The canvas only hosts
+  // the roaming snake sprite.
   ctx.clearRect(0, 0, CW, CH);
-
-  drawAnimCacti();     // desert biome: swaying pixel cacti
-  paths();             // road network
-  drawCyberPulse();    // cyber biome: animated wire pulses over roads
-  drawParticles();     // jungle fireflies + desert dust motes
-  drawRoamingSnake();  // jungle tier: roaming 16-bit snake sprite
-  nodes();             // course node buttons
-  player();            // player avatar
+  drawRoamingSnake();
 
   requestAnimationFrame(tick);
 }
@@ -1010,129 +1019,130 @@ document.addEventListener('keydown', e => {
 
   if (e.key === 'ArrowRight') {
     // Advance along main path; branch nodes exit back to parent
-    if (node.isBranch) { cur = node.branchFrom; }
-    else if (cur < MAIN_PATH_LEN - 1) { cur++; }
+    if (node.isBranch) { setCur(node.branchFrom); }
+    else if (cur < MAIN_PATH_LEN - 1) { setCur(cur + 1); }
     e.preventDefault();
   } else if (e.key === 'ArrowLeft') {
-    if (node.isBranch) { cur = node.branchFrom; }
-    else if (cur > 0)  { cur--; }
+    if (node.isBranch) { setCur(node.branchFrom); }
+    else if (cur > 0)  { setCur(cur - 1); }
     e.preventDefault();
   } else if (e.key === 'ArrowDown') {
     // Enter downward branch (W4/W7 → Quiz), or W5 → W4 shortcut
-    if (BRANCH_DOWN[cur] !== undefined) { cur = BRANCH_DOWN[cur]; e.preventDefault(); }
-    else if (cur === IDX_W5) { cur = IDX_W4; e.preventDefault(); }  // W5 → W4 shortcut
+    if (BRANCH_DOWN[cur] !== undefined) { setCur(BRANCH_DOWN[cur]); e.preventDefault(); }
+    else if (cur === IDX_W5) { setCur(IDX_W4); e.preventDefault(); }  // W5 → W4 shortcut
   } else if (e.key === 'ArrowUp') {
     // W4 → W5 shortcut, or exit downward branch back to parent (Quiz → parent)
-    if (cur === IDX_W4) { cur = IDX_W5; e.preventDefault(); }  // W4 → W5 shortcut
+    if (cur === IDX_W4) { setCur(IDX_W5); e.preventDefault(); }  // W4 → W5 shortcut
     else if (node.isBranch) {
       // Both quiz branches hang below their parent → UP returns to parent
-      cur = node.branchFrom; e.preventDefault();
+      setCur(node.branchFrom); e.preventDefault();
     }
   } else if (e.key === 'Enter' || e.key === ' ') {
     openModal(cur); e.preventDefault();
   }
 });
 
-canvas.addEventListener('click', e => {
-  const rect   = canvas.getBoundingClientRect();
-  const scaleX = CW / rect.width;
-  const scaleY = CH / rect.height;
-  const mx = (e.clientX - rect.left) * scaleX;
-  const my = (e.clientY - rect.top)  * scaleY;
-  for (let i = 0; i < NODES.length; i++) {
-    const {x, y} = NODES[i];
-    if ((mx-x)**2 + (my-y)**2 <= (NR+5)**2) { cur = i; openModal(i); break; }
-  }
-});
-
 // ══════════════════════════════════════════════════════════════════
 //  Modal
 // ══════════════════════════════════════════════════════════════════
+// Week 1 onboarding content (from the design handoff)
+const ONBOARDING = {
+  outcomes: ['Why use databases & SQL', 'Types of databases', 'Read & filter tables', 'Sanity-check data'],
+  agenda: [
+    { time: '60 min', text: 'Intro to class — get to know each other' },
+    { time: '15 min', text: 'Tools setup & break' },
+    { time: '45 min', text: 'SQL — why SQL and reading tables' },
+    { time: '15 min', text: 'Exercise / optional break' },
+    { time: '45 min', text: 'SQL — filtering and business scenarios' },
+    { time: '15 min', text: 'Reflection' },
+  ],
+  skills: [
+    { title: 'Skill #1 · Read table',  code: 'SELECT col1, col2\nFROM table_name\nLIMIT 10;', desc: 'Peek at any table — see its shape, columns, and data types.' },
+    { title: 'Skill #2 · Alias',       code: 'SELECT col1 AS label\nFROM table AS t\nLIMIT 10;', desc: 'Rename columns and tables in output for cleaner reads.' },
+    { title: 'Skill #3 · Filter rows', code: 'SELECT "TRANSACTION_ID", "CLAIM_AMOUNT"\nFROM insurance_data\nWHERE "CLAIM_AMOUNT" >= 100000;', desc: 'Use WHERE to slice data to exactly the rows that matter.' },
+  ],
+  setup: [
+    { n: 1, title: 'Install VS Code',              desc: 'Download from code.visualstudio.com/download' },
+    { n: 2, title: 'Install SQLTools extension',   desc: 'Extensions tab → search SQLTools → install SQLTools + PostgreSQL driver' },
+    { n: 3, title: 'Create a GitHub account',      desc: 'Go to github.com and sign up — you’ll use this for your portfolio' },
+    { n: 4, title: 'Connect to the class database', desc: 'In SQLTools → Add New Connection → PostgreSQL driver' },
+  ],
+};
+
 function openModal(idx) {
   const node   = NODES[idx];
-  const isQuiz = node && node.type === 'quiz';
+  if (!node) return;
+  const isQuiz = node.type === 'quiz';
   const w      = weekData(idx);
-  if (!w) return;
-
-  const locked = !isUnlocked(idx);
+  const meta   = NODE_META[node.id] || {};
+  const status = nodeStatus(idx);
   const mp     = w.max_points;
   const sc     = w.user_score;
-
-  // ── Header ────────────────────────────────────────────────────────
-  document.getElementById('m-week').textContent = isQuiz
-    ? `🏆 WEEK ${node.dataIndex} EVALUATION QUIZ`
-    : `WEEK ${node.dataIndex} — LESSON OBJECTIVES`;
-
-  document.getElementById('m-theme').textContent = isQuiz
-    ? (w.theme || 'HANDS-ON ASSESSMENT')
-    : (w.theme || '');
 
   // Biome theming — desert (W1-4) / jungle (W5-9) / cyber (W10-12);
   // quiz nodes inherit the zone of their branchFrom node via nodeZone().
   document.getElementById('modal-box').dataset.theme = nodeZone(idx);
 
-  // ── Shared XP progress panel HTML ─────────────────────────────────
-  function buildScoreHtml() {
-    if (locked) return `<p class="locked-msg">🔒 NOT YET UNLOCKED</p>`;
-    if (!mp)    return `<p class="no-score-msg">No assessment recorded</p>`;
-    const got = sc != null ? sc : 0;
-    const pct = Math.round(got / mp * 100);
-    const starsHtml = mp <= 5
-      ? `<div class="star-row">${
-          Array.from({length: mp}, (_, k) =>
-            `<span class="${k < got ? 'star-full' : 'star-empty'}">★</span>`).join('')
-        }</div>`
-      : '';
-    return `
-      <div class="xp-label">XP PROGRESS</div>
-      ${starsHtml}
-      <div>
-        <span class="xp-value">${sc != null ? sc : '—'}</span>
-        <span class="xp-denom"> / ${mp} XP</span>
-      </div>
-      <div class="xp-bar"><div class="xp-fill" style="width:${sc != null ? pct : 0}%"></div></div>
-      <div class="xp-pct">${sc != null ? pct + '%' : 'Score not recorded'}</div>`;
-  }
+  // ── Header band ───────────────────────────────────────────────────
+  document.getElementById('m-pill').textContent   = isQuiz ? 'Quiz' : `Week ${node.dataIndex}`;
+  document.getElementById('m-title').textContent  = w.theme || meta.title || node.label;
+  document.getElementById('m-island').textContent = meta.island || '';
 
-  // ── Parse objectives / instructions text ──────────────────────────
-  function parseLines() {
-    return (w.objectives || '').replace(/\r/g, '')
-      .split('\n')
-      // Strip list markers ("• ", "- ", "* ", "1. ", "2) ") but only when
-      // followed by a space, so objectives like "3NF schema" keep their digit.
-      .map(l => l.replace(/^\s*(?:[•\-\*]|\d+[\.\)])\s+/, '').trim())
-      .filter(l => l.length > 0);
-  }
-
-  // ── Body HTML — branched by node.type ────────────────────────────
+  // ── Body ──────────────────────────────────────────────────────────
   const bodyEl = document.getElementById('m-body');
 
-  if (isQuiz) {
-    const lines = parseLines();
-    const instructionHtml = lines.length
-      ? lines.map(l => `<li>${escHtml(l)}</li>`).join('')
-      : [
-          `<li>Complete the hands-on database assessment on your local development environment</li>`,
-          `<li>Total Points Possible: ${mp || '—'}</li>`,
-          `<li>Submit your work via the course portal before the deadline</li>`,
-        ].join('');
+  // Objectives from the live sheet become the mastery-star rows;
+  // fall back to the handoff's static copy when the sheet has none.
+  const lines = (w.objectives || '').replace(/\r/g, '')
+    .split('\n')
+    // Strip list markers ("• ", "- ", "* ", "1. ", "2) ") but only when
+    // followed by a space, so objectives like "3NF schema" keep their digit.
+    .map(l => l.replace(/^\s*(?:[•\-\*]|\d+[\.\)])\s+/, '').trim())
+    .filter(l => l.length > 0);
 
+  if (node.id === 'W1') {
+    // Onboarding variant (Week 1 only)
     bodyEl.innerHTML = `
-      <div class="section-label">📋 ASSESSMENT OVERVIEW</div>
-      <ul class="quiz-info-list">${instructionHtml}</ul>
-      <div class="section-label" style="margin-top:16px">🏆 SUBMISSION STATUS</div>
-      <div class="xp-panel">${buildScoreHtml()}</div>`;
+      <div class="m-section-label">🎯 Today's learning outcomes</div>
+      <div class="m-tags">${ONBOARDING.outcomes.map(o =>
+        `<div class="m-row m-tag">${escHtml(o)}</div>`).join('')}</div>
+      <div class="m-section-label">📋 Agenda</div>
+      <div class="m-stack" style="margin-bottom:20px">${ONBOARDING.agenda.map(a =>
+        `<div class="m-row m-agenda-row"><span class="m-time-badge">${escHtml(a.time)}</span>${escHtml(a.text)}</div>`).join('')}</div>
+      <div class="m-section-label">⚔️ SQL skills unlocked</div>
+      <div class="m-stack" style="gap:10px;margin-bottom:20px">${ONBOARDING.skills.map(s =>
+        `<div class="m-row m-skill-card">
+           <div class="m-skill-title">${escHtml(s.title)}</div>
+           <div class="m-skill-code">${escHtml(s.code)}</div>
+           <div class="m-skill-desc">${escHtml(s.desc)}</div>
+         </div>`).join('')}</div>
+      <div class="m-section-label">🛠️ Setup checklist</div>
+      <div class="m-stack" style="margin-bottom:6px">${ONBOARDING.setup.map(st =>
+        `<div class="m-row m-setup-row">
+           <div class="m-setup-num">${st.n}</div>
+           <div><div class="m-setup-title">${escHtml(st.title)}</div>
+                <div class="m-setup-desc">${escHtml(st.desc)}</div></div>
+         </div>`).join('')}</div>
+      <div class="m-footer">
+        <a href="https://docs.google.com/presentation/d/" target="_blank" class="m-btn-primary">📊 Week 1 Slides</a>
+        <button class="m-btn-outline" onclick="closeModal()">Close</button>
+      </div>`;
   } else {
-    const lines   = parseLines();
-    const objHtml = lines.length
-      ? lines.map(l => `<li>${escHtml(l)}</li>`).join('')
-      : '<li style="color:#444;font-style:italic">No objectives listed</li>';
+    // Standard lesson/quiz variant: status pill + description + mastery stars
+    const pill = {
+      done:    { bg: '#16341f', fg: '#7fd99a', icon: '✓',  label: 'Complete' },
+      current: { bg: '#3a3213', fg: '#ffe28a', icon: '★',  label: 'In progress' },
+      locked:  { bg: '#2a2f38', fg: '#aab2bd', icon: '🔒', label: 'Locked — finish prior week' },
+    }[status];
+    const scoreTxt = (sc != null && mp) ? ` · ${sc} / ${mp} pts` : '';
+    const stars = lines.length ? lines : (meta.stars || []);
 
     bodyEl.innerHTML = `
-      <div class="section-label">📚 LEARNING OBJECTIVES</div>
-      <ul class="obj-list">${objHtml}</ul>
-      <div class="section-label" style="margin-top:16px">🏆 YOUR SCORE</div>
-      <div class="xp-panel">${buildScoreHtml()}</div>`;
+      <div class="m-status-pill" style="background:${pill.bg};color:${pill.fg}">${pill.icon} ${pill.label}${scoreTxt}</div>
+      <p class="m-about">${escHtml(meta.about || w.theme || '')}</p>
+      <div class="m-section-label">⭐ Mastery stars</div>
+      <div class="m-stack">${(stars.length ? stars : ['No objectives listed']).map(s =>
+        `<div class="m-row m-star-row"><div class="glyph">★</div><div>${escHtml(s)}</div></div>`).join('')}</div>`;
   }
 
   document.getElementById('modal-wrap').classList.add('open');
@@ -1164,7 +1174,9 @@ function enterGameView() {
   document.getElementById('screen-loading').style.display = 'none';
   document.getElementById('screen-login').style.display   = 'none';
   document.getElementById('game-wrap').style.display      = 'block';
-  cur = 0;
+  buildNodeCards();   // node statuses derive from the freshly loaded data
+  renderTrail();      // segment colors derive from node statuses
+  setCur(0);
   startLoop();
 }
 
