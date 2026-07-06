@@ -46,10 +46,12 @@ Without OAuth configured, `/api/syllabus-data` works without auth. Without Sheet
 
 ### Frontend (`static/index.html`)
 
-- **`NODES` array** — source of truth for all 14 course nodes; each has `id`, `label`, `type` (`'week'`/`'quiz'`), `dataIndex`, and canvas `x`/`y` (quiz nodes also carry `isBranch`/`branchFrom`)
-- **Canvas render loop** — `tick()` calls `paths()` + `nodes()` + `player()` plus animation overlays every frame; guarded by `startLoop()`/`stopLoop()` so only one rAF loop ever runs
+- **`NODES` array** — source of truth for all 14 course nodes; each has `id`, `label`, `type` (`'week'`/`'quiz'`), `dataIndex`, and world `x`/`y` (quiz nodes also carry `isBranch`/`branchFrom`); `NODE_META` holds per-node design copy (title/island/about/stars)
+- **Layered world** — a pannable/zoomable `#map-frame` contains `#world` (1000×600, CSS `transform`): canvas (background art + roaming snake) → `#trail` SVG (animated dashed paths, rebuilt by `renderTrail()`) → `#deco-layer` (CSS-animated dust/fireflies/cacti/sparks) → `#node-layer` (DOM `.node-card` buttons, rebuilt by `buildNodeCards()`) → `#player-sprite` emoji
+- **Render loop** — `tick()` only draws the snake on canvas; guarded by `startLoop()`/`stopLoop()` so only one rAF loop ever runs. All other animation is CSS keyframes
+- **`nodeStatus(i)`** — maps progress data into `done`/`current`/`locked` for card styling and trail colors
 - **`weekData(i)`** — maps node index → sheet row by label search; memoized in `weekDataCache`, reset via `invalidateWeekData()` whenever `weeks` is reassigned
-- **`openModal(idx)`** — builds and displays the per-node progress modal, themed by biome via `data-theme`
+- **`openModal(idx)`** — biome-themed (`data-theme`) modal; Week 1 gets the onboarding layout (outcomes/agenda/skills/setup), all other nodes get status pill + about + mastery stars (sheet objectives, falling back to `NODE_META.stars`)
 
 ## Making Changes
 
@@ -57,7 +59,7 @@ Without OAuth configured, `/api/syllabus-data` works without auth. Without Sheet
 
 **Editing week content** — update `MOCK_WEEKS` in `main.py` (used for guest mode and fallback); the authoritative content lives in the Google Sheet.
 
-**Styling** — the aesthetic uses Press Start 2P (Google Fonts) and NES.css for pixel-art UI. Zone palettes are hard-coded in `drawMainSegment`/`drawBranchSegment`.
+**Styling** — the aesthetic uses Press Start 2P (HUD), VT323 (modal titles), and JetBrains Mono (modal body) from Google Fonts, plus NES.css for the login screen. Node-status palettes live in the `.node-card[data-status=…]` CSS rules; trail zone tints in `renderTrail()`; modal biome palettes in the `#modal-box[data-theme=…]` CSS variables.
 
 ## Testing
 
