@@ -25,8 +25,18 @@ jobs:
           git remote add huggingface \
             https://twchyin:${HF_TOKEN}@huggingface.co/spaces/twchyin/MARA_map
 
-          # Create a single orphan commit containing only the current tree.
-          # This strips all git history so HF never sees commits that had PNGs.
-          TREE=$(git rev-parse HEAD^{tree})
-          COMMIT=$(git commit-tree "$TREE" -m "Sync from GitHub ($(git rev-parse --short HEAD))")
-          git push huggingface "${COMMIT}:refs/heads/main" --force --verbose
+          SRC=$(git rev-parse --short HEAD)
+
+          # HF's pre-receive hook rejects raw binary files (e.g. PNGs) —
+          # they must be pushed as Git LFS objects. Rebuild the tree on an
+          # orphan branch with *.png tracked by git-lfs: re-adding the files
+          # converts them to LFS pointers, and the git-lfs pre-push hook
+          # uploads the objects to the Space's LFS storage. The orphan
+          # branch also keeps history stripped, as before.
+          git lfs install
+          git checkout --orphan hf-sync
+          git rm -r --cached . -q
+          git lfs track "*.png"
+          git add -A
+          git commit -q -m "Sync from GitHub (${SRC})"
+          git push huggingface hf-sync:refs/heads/main --force --verbose
