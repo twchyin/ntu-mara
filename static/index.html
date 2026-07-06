@@ -14,18 +14,17 @@
       background: #08081a;
       font-family: 'Press Start 2P', monospace;
       color: #fff;
-      min-height: 100vh;
+      height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      overflow-x: hidden;
+      overflow: hidden;
     }
 
     /* ── HUD ── */
     #hud {
       width: 100%;
-      max-width: 1000px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -54,22 +53,22 @@
     #logout-btn:hover, #logout-btn:focus { background: #8a2020; color: #fff; }
     #logout-btn:active { box-shadow: none; transform: translate(2px, 2px); }
 
-    /* ── Game map frame (pannable / zoomable ocean viewport) ── */
+    /* ── Game map frame (pannable / zoomable, fills the viewport) ── */
     #game-wrap {
       position: relative;
       width: 100%;
-      max-width: 1000px;
-      padding-top: 10px;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
     #map-frame {
       position: relative;
       width: 100%;
-      height: 520px;
-      background: #0a3d5c;
-      border: 3px solid #041c2e;
-      border-radius: 10px;
+      flex: 1 1 auto;
+      min-height: 0;
+      background: #08081a;   /* matches page bg — no ocean panel */
       overflow: hidden;
-      box-shadow: 0 10px 0 #041420, 0 16px 30px rgba(0,0,0,.4);
       touch-action: none;
       cursor: grab;
     }
@@ -772,12 +771,25 @@ function nodeStatus(i) {
 // ══════════════════════════════════════════════════════════════════
 const mapFrame = document.getElementById('map-frame');
 const worldEl  = document.getElementById('world');
-const view     = { x: 40, y: 46, scale: 0.68 };
+const view     = { x: 0, y: 0, scale: 0.68 };
 
 function applyView() {
   worldEl.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
 }
 applyView();
+
+// Scale the 1000×600 world to fill the frame and center it. Runs when the
+// game view opens (frame has no size while hidden) and on window resize.
+function fitView() {
+  const fw = mapFrame.clientWidth, fh = mapFrame.clientHeight;
+  if (!fw || !fh) return;
+  const s = Math.min(fw / CW, fh / CH);
+  view.scale = s;
+  view.x = (fw - CW * s) / 2;
+  view.y = (fh - CH * s) / 2;
+  applyView();
+}
+window.addEventListener('resize', fitView);
 
 let dragState = null;
 mapFrame.addEventListener('pointerdown', e => {
@@ -804,7 +816,9 @@ mapFrame.addEventListener('pointerup', endPan);
 mapFrame.addEventListener('pointercancel', endPan);
 
 function zoomBy(amt) {
-  view.scale = Math.min(Math.max(0.2, view.scale + amt), 1.2);
+  // Upper clamp is generous so fit-to-screen scales (>1 on large monitors)
+  // still leave room to zoom in further.
+  view.scale = Math.min(Math.max(0.2, view.scale + amt), 2.5);
   applyView();
 }
 document.getElementById('zoom-in').addEventListener('click',  () => zoomBy(+0.1));
@@ -1008,7 +1022,7 @@ function tick() {
 document.addEventListener('keydown', e => {
   // Ignore game input while the loading or login screen is showing —
   // otherwise Enter would pop an empty modal over the login prompt.
-  if (document.getElementById('game-wrap').style.display !== 'block') return;
+  if (document.getElementById('game-wrap').style.display !== 'flex') return;
 
   if (document.getElementById('modal-wrap').classList.contains('open')) {
     if (e.key === 'Escape') { closeModal(); e.preventDefault(); }
@@ -1173,7 +1187,8 @@ function enterGameView() {
   document.getElementById('logout-btn').style.display = 'inline-block';
   document.getElementById('screen-loading').style.display = 'none';
   document.getElementById('screen-login').style.display   = 'none';
-  document.getElementById('game-wrap').style.display      = 'block';
+  document.getElementById('game-wrap').style.display      = 'flex';
+  fitView();          // maximize the world to the now-visible frame
   buildNodeCards();   // node statuses derive from the freshly loaded data
   renderTrail();      // segment colors derive from node statuses
   setCur(0);
