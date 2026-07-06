@@ -416,95 +416,6 @@
     }
     .m-star-row .glyph { font-size: 18px; color: var(--th-accent, #FFD700); }
     .m-stack   { display: flex; flex-direction: column; gap: 8px; }
-    .m-tags    { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-    .m-tag     { padding: 6px 12px; font-size: 12.5px; color: #d0d8e8; }
-    .m-agenda-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 9px 12px;
-      font-size: 12.5px;
-      color: #d0d8e8;
-    }
-    .m-time-badge {
-      background: #2c3548;
-      color: #9fb0d0;
-      border-radius: 3px;
-      padding: 2px 7px;
-      font-size: 10.5px;
-      font-weight: 600;
-      flex-shrink: 0;
-    }
-    .m-skill-card { padding: 12px 14px; }
-    .m-skill-title {
-      font-size: 11.5px;
-      font-weight: 700;
-      color: #9fb0d0;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-    }
-    .m-skill-code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: #a8f0c0;
-      background: #0d1120;
-      border-radius: 4px;
-      padding: 8px 10px;
-      white-space: pre;
-      overflow-x: auto;
-      line-height: 1.6;
-      border: 1px solid #1e2436;
-    }
-    .m-skill-desc { font-size: 12px; color: #8a97b8; margin-top: 8px; line-height: 1.5; }
-    .m-setup-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 10px 14px;
-    }
-    .m-setup-num {
-      width: 22px; height: 22px;
-      border-radius: 3px;
-      background: #2c3548;
-      color: #c0ccea;
-      font-size: 11px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .m-setup-title { font-size: 12.5px; font-weight: 600; color: #dbe2f4; margin-bottom: 2px; }
-    .m-setup-desc  { font-size: 11.5px; color: #7a87a8; line-height: 1.45; }
-    .m-footer { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
-    .m-btn-primary {
-      flex: 1;
-      min-width: 140px;
-      padding: 10px 16px;
-      border-radius: 4px;
-      font-size: 12.5px;
-      font-weight: 700;
-      text-align: center;
-      text-decoration: none;
-      background: var(--th-accent, #FFD700);
-      color: #111;
-      box-shadow: 2px 2px 0 rgba(0,0,0,.4);
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .m-btn-outline {
-      flex: 1;
-      min-width: 140px;
-      padding: 10px 16px;
-      border-radius: 4px;
-      font-size: 12.5px;
-      font-weight: 700;
-      background: transparent;
-      color: var(--th-text-dim, #999);
-      border: 2px solid var(--th-border, #888);
-      cursor: pointer;
-      font-family: 'JetBrains Mono', monospace;
-    }
 
     /* NES.css overrides */
     .nes-btn { font-family: 'Press Start 2P', monospace !important; font-size: 9px !important; }
@@ -671,33 +582,33 @@ function isUnlocked(i) {
 // title/island/about are design content; live sheet data (theme,
 // objectives, scores) still drives the modal wherever it exists.
 const NODE_META = {
-  W1:  { title: 'Intro & SQL Basics', island: 'Desert — Onboarding', about: 'Set up VS Code and SQLTools, connect to a database, and write your first SQL queries against insurance claims data.',
+  W1:  { title: 'Intro & SQL Basics', island: 'SQL Desert', about: 'Set up VS Code and SQLTools, connect to a database, and write your first SQL queries against insurance claims data.',
          stars: ['Install tools & create GitHub account', 'Read and profile tables with SELECT, FROM, LIMIT', 'Filter rows with WHERE and alias columns'] },
-  W2:  { title: 'Schema & Keys',      island: 'Desert Kingdom',      about: 'Explore tables, relationships, and primary keys to navigate the kingdom.',
+  W2:  { title: 'Schema & Keys',      island: 'SQL Desert',      about: 'Explore tables, relationships, and primary keys to navigate the kingdom.',
          stars: ['Inspect schema diagram', 'Filter with WHERE', 'Join two tables'] },
-  W3:  { title: 'Joining Tables',     island: 'Desert Kingdom',      about: 'Combine datasets using JOINs and learn to avoid duplicate pitfalls.',
+  W3:  { title: 'Joining Tables',     island: 'SQL Desert',      about: 'Combine datasets using JOINs and learn to avoid duplicate pitfalls.',
          stars: ['INNER JOIN mastery', 'LEFT JOIN comparisons', 'Handle duplicates'] },
-  W4:  { title: 'Aggregation',        island: 'Desert Kingdom',      about: 'Level up with aggregation and grouping across the realm.',
+  W4:  { title: 'Aggregation',        island: 'SQL Desert',      about: 'Level up with aggregation and grouping across the realm.',
          stars: ['GROUP BY and HAVING', 'Aggregate functions', 'Order results'] },
-  W5:  { title: 'Pandas Cleanup',     island: 'Jungle Valley',       about: 'Clean datasets and automate transformations with Python.',
+  W5:  { title: 'Pandas Cleanup',     island: 'Python Valley',       about: 'Clean datasets and automate transformations with Python.',
          stars: ['Load CSV with pandas', 'Clean missing values', 'Export cleaned data'] },
-  W6:  { title: 'Merging Data',       island: 'Jungle Valley',       about: 'Merge data sources and handle exceptions.',
+  W6:  { title: 'Merging Data',       island: 'Python Valley',       about: 'Merge data sources and handle exceptions.',
          stars: ['Merge two datasets', 'Handle key errors', 'Write reusable functions'] },
-  W7:  { title: 'Mini Pipeline',      island: 'Jungle Valley',       about: 'Build a mini pipeline that runs end-to-end.',
+  W7:  { title: 'Mini Pipeline',      island: 'Python Valley',       about: 'Build a mini pipeline that runs end-to-end.',
          stars: ['Create ETL script', 'Schedule a run', 'Generate a report'] },
-  W8:  { title: 'Indexes',            island: 'Jungle Valley',       about: 'Learn to optimize queries with indexes and explain plans.',
+  W8:  { title: 'Indexes',            island: 'Python Valley',       about: 'Learn to optimize queries with indexes and explain plans.',
          stars: ['Identify slow queries', 'Add index', 'Compare execution plan'] },
-  W9:  { title: 'Query Refactor',     island: 'Jungle Valley',       about: 'Refactor queries for efficiency and cost.',
+  W9:  { title: 'Query Refactor',     island: 'Python Valley',       about: 'Refactor queries for efficiency and cost.',
          stars: ['Rewrite heavy query', 'Reduce scanned rows', 'Document improvements'] },
-  W10: { title: 'Performance',        island: 'Cyber Core',          about: 'Measure performance and enforce limits.',
+  W10: { title: 'Performance',        island: 'Cyber AI Core',          about: 'Measure performance and enforce limits.',
          stars: ['Set query timeout', 'Monitor performance', 'Optimize joins'] },
-  W11: { title: 'Final Prep',         island: 'Cyber Core',          about: 'Prepare for the boss stages and finalize your mastery.',
+  W11: { title: 'Final Prep',         island: 'Cyber AI Core',          about: 'Prepare for the boss stages and finalize your mastery.',
          stars: ['Boss stage 1 clear', 'Boss stage 2 clear', 'Final reflection'] },
-  W12: { title: 'Showcase',           island: 'Cyber Core',          about: 'Complete the final showcase and celebrate your mastery.',
+  W12: { title: 'Showcase',           island: 'Cyber AI Core',          about: 'Complete the final showcase and celebrate your mastery.',
          stars: ['Final demo', 'Peer review', 'Project showcase'] },
-  Q4:  { title: 'Week 4 Evaluation Quiz', island: 'Desert Kingdom', about: 'Hands-on database assessment covering everything through Week 4 — submit via the course portal before the deadline.',
+  Q4:  { title: 'Week 4 Evaluation Quiz', island: 'SQL Desert', about: 'Hands-on database assessment covering everything through Week 4 — submit via the course portal before the deadline.',
          stars: ['Complete the assessment', 'Submit before deadline'] },
-  Q7:  { title: 'Week 7 Evaluation Quiz', island: 'Jungle Valley',  about: 'Hands-on database assessment covering everything through Week 7 — submit via the course portal before the deadline.',
+  Q7:  { title: 'Week 7 Evaluation Quiz', island: 'Python Valley',  about: 'Hands-on database assessment covering everything through Week 7 — submit via the course portal before the deadline.',
          stars: ['Complete the assessment', 'Submit before deadline'] },
 };
 
@@ -1059,30 +970,6 @@ document.addEventListener('keydown', e => {
 // ══════════════════════════════════════════════════════════════════
 //  Modal
 // ══════════════════════════════════════════════════════════════════
-// Week 1 onboarding content (from the design handoff)
-const ONBOARDING = {
-  outcomes: ['Why use databases & SQL', 'Types of databases', 'Read & filter tables', 'Sanity-check data'],
-  agenda: [
-    { time: '60 min', text: 'Intro to class — get to know each other' },
-    { time: '15 min', text: 'Tools setup & break' },
-    { time: '45 min', text: 'SQL — why SQL and reading tables' },
-    { time: '15 min', text: 'Exercise / optional break' },
-    { time: '45 min', text: 'SQL — filtering and business scenarios' },
-    { time: '15 min', text: 'Reflection' },
-  ],
-  skills: [
-    { title: 'Skill #1 · Read table',  code: 'SELECT col1, col2\nFROM table_name\nLIMIT 10;', desc: 'Peek at any table — see its shape, columns, and data types.' },
-    { title: 'Skill #2 · Alias',       code: 'SELECT col1 AS label\nFROM table AS t\nLIMIT 10;', desc: 'Rename columns and tables in output for cleaner reads.' },
-    { title: 'Skill #3 · Filter rows', code: 'SELECT "TRANSACTION_ID", "CLAIM_AMOUNT"\nFROM insurance_data\nWHERE "CLAIM_AMOUNT" >= 100000;', desc: 'Use WHERE to slice data to exactly the rows that matter.' },
-  ],
-  setup: [
-    { n: 1, title: 'Install VS Code',              desc: 'Download from code.visualstudio.com/download' },
-    { n: 2, title: 'Install SQLTools extension',   desc: 'Extensions tab → search SQLTools → install SQLTools + PostgreSQL driver' },
-    { n: 3, title: 'Create a GitHub account',      desc: 'Go to github.com and sign up — you’ll use this for your portfolio' },
-    { n: 4, title: 'Connect to the class database', desc: 'In SQLTools → Add New Connection → PostgreSQL driver' },
-  ],
-};
-
 function openModal(idx) {
   const node   = NODES[idx];
   if (!node) return;
@@ -1114,50 +1001,22 @@ function openModal(idx) {
     .map(l => l.replace(/^\s*(?:[•\-\*]|\d+[\.\)])\s+/, '').trim())
     .filter(l => l.length > 0);
 
-  if (node.id === 'W1') {
-    // Onboarding variant (Week 1 only)
-    bodyEl.innerHTML = `
-      <div class="m-section-label">🎯 Today's learning outcomes</div>
-      <div class="m-tags">${ONBOARDING.outcomes.map(o =>
-        `<div class="m-row m-tag">${escHtml(o)}</div>`).join('')}</div>
-      <div class="m-section-label">📋 Agenda</div>
-      <div class="m-stack" style="margin-bottom:20px">${ONBOARDING.agenda.map(a =>
-        `<div class="m-row m-agenda-row"><span class="m-time-badge">${escHtml(a.time)}</span>${escHtml(a.text)}</div>`).join('')}</div>
-      <div class="m-section-label">⚔️ SQL skills unlocked</div>
-      <div class="m-stack" style="gap:10px;margin-bottom:20px">${ONBOARDING.skills.map(s =>
-        `<div class="m-row m-skill-card">
-           <div class="m-skill-title">${escHtml(s.title)}</div>
-           <div class="m-skill-code">${escHtml(s.code)}</div>
-           <div class="m-skill-desc">${escHtml(s.desc)}</div>
-         </div>`).join('')}</div>
-      <div class="m-section-label">🛠️ Setup checklist</div>
-      <div class="m-stack" style="margin-bottom:6px">${ONBOARDING.setup.map(st =>
-        `<div class="m-row m-setup-row">
-           <div class="m-setup-num">${st.n}</div>
-           <div><div class="m-setup-title">${escHtml(st.title)}</div>
-                <div class="m-setup-desc">${escHtml(st.desc)}</div></div>
-         </div>`).join('')}</div>
-      <div class="m-footer">
-        <a href="https://docs.google.com/presentation/d/" target="_blank" class="m-btn-primary">📊 Week 1 Slides</a>
-        <button class="m-btn-outline" onclick="closeModal()">Close</button>
-      </div>`;
-  } else {
-    // Standard lesson/quiz variant: status pill + description + mastery stars
-    const pill = {
-      done:    { bg: '#16341f', fg: '#7fd99a', icon: '✓',  label: 'Complete' },
-      current: { bg: '#3a3213', fg: '#ffe28a', icon: '★',  label: 'In progress' },
-      locked:  { bg: '#2a2f38', fg: '#aab2bd', icon: '🔒', label: 'Locked — finish prior week' },
-    }[status];
-    const scoreTxt = (sc != null && mp) ? ` · ${sc} / ${mp} pts` : '';
-    const stars = lines.length ? lines : (meta.stars || []);
+  // Single layout for every node (weeks and quizzes alike):
+  // status pill + description + mastery stars from the Google Sheet.
+  const pill = {
+    done:    { bg: '#16341f', fg: '#7fd99a', icon: '✓',  label: 'Complete' },
+    current: { bg: '#3a3213', fg: '#ffe28a', icon: '★',  label: 'In progress' },
+    locked:  { bg: '#2a2f38', fg: '#aab2bd', icon: '🔒', label: 'Locked — finish prior week' },
+  }[status];
+  const scoreTxt = (sc != null && mp) ? ` · ${sc} / ${mp} pts` : '';
+  const stars = lines.length ? lines : (meta.stars || []);
 
-    bodyEl.innerHTML = `
-      <div class="m-status-pill" style="background:${pill.bg};color:${pill.fg}">${pill.icon} ${pill.label}${scoreTxt}</div>
-      <p class="m-about">${escHtml(meta.about || w.theme || '')}</p>
-      <div class="m-section-label">⭐ Mastery stars</div>
-      <div class="m-stack">${(stars.length ? stars : ['No objectives listed']).map(s =>
-        `<div class="m-row m-star-row"><div class="glyph">★</div><div>${escHtml(s)}</div></div>`).join('')}</div>`;
-  }
+  bodyEl.innerHTML = `
+    <div class="m-status-pill" style="background:${pill.bg};color:${pill.fg}">${pill.icon} ${pill.label}${scoreTxt}</div>
+    <p class="m-about">${escHtml(meta.about || w.theme || '')}</p>
+    <div class="m-section-label">⭐ Mastery stars</div>
+    <div class="m-stack">${(stars.length ? stars : ['No objectives listed']).map(s =>
+      `<div class="m-row m-star-row"><div class="glyph">★</div><div>${escHtml(s)}</div></div>`).join('')}</div>`;
 
   document.getElementById('modal-wrap').classList.add('open');
 }

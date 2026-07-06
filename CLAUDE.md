@@ -51,7 +51,7 @@ Without OAuth configured, `/api/syllabus-data` works without auth. Without Sheet
 - **Render loop** — `tick()` only draws the snake on canvas; guarded by `startLoop()`/`stopLoop()` so only one rAF loop ever runs. All other animation is CSS keyframes
 - **`nodeStatus(i)`** — maps progress data into `done`/`current`/`locked` for card styling and trail colors
 - **`weekData(i)`** — maps node index → sheet row by label search; memoized in `weekDataCache`, reset via `invalidateWeekData()` whenever `weeks` is reassigned
-- **`openModal(idx)`** — biome-themed (`data-theme`) modal; Week 1 gets the onboarding layout (outcomes/agenda/skills/setup), all other nodes get status pill + about + mastery stars (sheet objectives, falling back to `NODE_META.stars`)
+- **`openModal(idx)`** — biome-themed (`data-theme`) modal; every node uses the same layout: status pill + about + mastery stars (sheet objectives, falling back to `NODE_META.stars`)
 
 ## Making Changes
 
